@@ -193,7 +193,13 @@ async function exportSingleItem(type, id, options = {}) {
             return;
         }
 
-        await exportSingleChat(chat, options);
+        // Map checkbox options to export options
+        const exportOptions = {
+            includeCharacter: options[`chat_character_${id}`] !== false,
+            exportBundle: options[`chat_bundle_${id}`] || false
+        };
+
+        await exportSingleChat(chat, exportOptions);
     } else if (type === 'personas') {
         await exportSinglePersona(id);
     } else {
@@ -222,13 +228,17 @@ async function exportSelectedItems(type, ids) {
             const chat = allChats.find(c => c.id === id);
             if (!chat) return null;
 
-            // Get the "Include Character" checkbox state for this specific chat
+            // Get checkbox states for this specific chat
             const includeCharacterCheckbox = $(`#chat_character_${id}`);
             const includeCharacter = includeCharacterCheckbox.length ? includeCharacterCheckbox.prop('checked') : true;
 
+            const exportBundleCheckbox = $(`#chat_bundle_${id}`);
+            const exportBundle = exportBundleCheckbox.length ? exportBundleCheckbox.prop('checked') : false;
+
             return {
                 chat,
-                includeCharacter
+                includeCharacter,
+                exportBundle
             };
         }).filter(Boolean); // Remove nulls
 

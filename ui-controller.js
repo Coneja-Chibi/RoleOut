@@ -255,6 +255,8 @@ function createItemOptionsPanel(type, item) {
             break;
         case 'chats':
             optionsGroup.append(createOptionCheckbox(`chat_character_${item.id}`, 'Include Character', true));
+            optionsGroup.append(createOptionCheckbox(`chat_bundle_${item.id}`, 'Export as Bundle (includes preset, persona, character, and all settings)', false));
+            optionsGroup.append($('<div class="rolecall-no-options" style="margin-top: 8px; font-size: 0.85em; opacity: 0.8;">Bundle exports everything needed to recreate this chat in RoleCall</div>'));
             break;
         case 'presets':
             optionsGroup.append(createOptionCheckbox(`preset_config_${item.id}`, 'Include Current Configuration (enabled/disabled prompts)', false));

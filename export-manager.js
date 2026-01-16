@@ -3,9 +3,11 @@
  * Separated concern: Export business logic
  */
 
-import { getRequestHeaders } from '../../../../script.js';
+import { getRequestHeaders, user_avatar } from '../../../../script.js';
 import { getCharacterList, getPersonaList } from './data-providers.js';
 import { embedMetadataInPNG } from './png-metadata.js';
+import { power_user } from '../../../power-user.js';
+import { openai_setting_names } from '../../../openai.js';
 
 const MODULE_NAME = 'RoleOut-Export';
 const MAX_CONCURRENT_EXPORTS = 5; // Don't hammer the server
@@ -307,9 +309,118 @@ export async function exportSingleChat(chat, options = {}) {
         console.log(`[${MODULE_NAME}] Exporting chat: ${chat.file_name}`, options);
 
         const includeCharacter = options.includeCharacter !== false; // Default true
+        const exportBundle = options.exportBundle || false; // Bundle includes preset + persona + character
 
-        // If including character, export as ZIP with chat + character card
-        if (includeCharacter && chat.avatar) {
+        // If exporting as bundle, create comprehensive ZIP
+        if (exportBundle && chat.avatar) {
+            const JSZip = await loadJSZip();
+            const zip = new JSZip();
+
+            // 1. Export chat as JSONL
+            const chatResponse = await fetch('/api/chats/export', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({
+                    file: chat.file_name,
+                    avatar_url: chat.avatar,
+                    format: 'jsonl',
+                    exportfilename: `${chat.file_name}.jsonl`
+                }),
+            });
+
+            if (!chatResponse.ok) {
+                throw new Error(`Chat export failed: HTTP ${chatResponse.status}`);
+            }
+
+            const chatData = await chatResponse.json();
+            if (!chatData.result) {
+                throw new Error('Chat export returned no data');
+            }
+
+            const chatFilename = getSafeFilename(chat.file_name, 'jsonl');
+            zip.file(`chat/${chatFilename}`, chatData.result);
+
+            // 2. Export character as PNG
+            const charResponse = await fetch('/api/characters/export', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({
+                    format: 'png',
+                    avatar_url: chat.avatar
+                }),
+            });
+
+            if (!charResponse.ok) {
+                throw new Error(`Character export failed: HTTP ${charResponse.status}`);
+            }
+
+            const charBlob = await charResponse.blob();
+            const charFilename = getSafeFilename(chat.avatar, 'png');
+            zip.file(`character/${charFilename}`, charBlob);
+
+            // 3. Export current preset as JSON
+            const currentPresetName = power_user?.preset_settings || power_user?.main_api;
+            if (currentPresetName && openai_setting_names?.includes(currentPresetName)) {
+                try {
+                    const presetResponse = await fetch('/api/presets/get', {
+                        method: 'POST',
+                        headers: getRequestHeaders(),
+                        body: JSON.stringify({ name: currentPresetName }),
+                    });
+
+                    if (presetResponse.ok) {
+                        const presetData = await presetResponse.json();
+                        const presetFilename = getSafeFilename(currentPresetName, 'json');
+                        zip.file(`preset/${presetFilename}`, JSON.stringify(presetData, null, 2));
+                        console.log(`[${MODULE_NAME}] Added preset to bundle: ${currentPresetName}`);
+                    }
+                } catch (presetError) {
+                    console.warn(`[${MODULE_NAME}] Could not export preset:`, presetError);
+                    // Continue without preset - not critical
+                }
+            }
+
+            // 4. Export current persona as PNG with embedded metadata
+            if (user_avatar) {
+                try {
+                    const avatarResponse = await fetch(`/User Avatars/${user_avatar}`);
+                    if (avatarResponse.ok) {
+                        const avatarBlob = await avatarResponse.blob();
+                        const avatarBuffer = await avatarBlob.arrayBuffer();
+                        const pngData = new Uint8Array(avatarBuffer);
+
+                        // Get persona metadata from power_user
+                        const personaMetadata = {
+                            name: power_user?.persona_description || 'User',
+                            description: power_user?.persona_description || '',
+                            avatar: user_avatar,
+                            exportedAt: new Date().toISOString(),
+                            exportedBy: 'RoleOut'
+                        };
+
+                        // Embed metadata into PNG
+                        const pngWithMetadata = embedMetadataInPNG(pngData, 'persona', personaMetadata);
+                        const personaFilename = getSafeFilename(user_avatar, 'png');
+                        zip.file(`persona/${personaFilename}`, pngWithMetadata);
+                        console.log(`[${MODULE_NAME}] Added persona to bundle: ${user_avatar}`);
+                    }
+                } catch (personaError) {
+                    console.warn(`[${MODULE_NAME}] Could not export persona:`, personaError);
+                    // Continue without persona - not critical
+                }
+            }
+
+            // Generate and download bundle ZIP
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const timestamp = getTimestampForFilename();
+            const zipFilename = `RoleOut_ChatBundle_${getSafeFilename(chat.file_name, '')}_${timestamp}.zip`;
+            downloadBlob(zipBlob, zipFilename);
+
+            console.log(`[${MODULE_NAME}] Successfully exported chat bundle: ${zipFilename}`);
+            toastr.success(`Exported complete chat bundle`, 'RoleOut');
+            return { success: true };
+
+        } else if (includeCharacter && chat.avatar) {
             const JSZip = await loadJSZip();
             const zip = new JSZip();
 
@@ -523,13 +634,24 @@ export async function exportChatsAsZip(chatExports) {
 
         while (queue.length > 0 || inProgress.size > 0) {
             while (inProgress.size < MAX_CONCURRENT_EXPORTS && queue.length > 0) {
-                const { chat, includeCharacter } = queue.shift();
-                const promise = exportSingleChatToBlob(chat, includeCharacter)
-                    .then(result => {
-                        inProgress.delete(promise);
-                        return result;
-                    });
-                inProgress.add(promise);
+                const { chat, includeCharacter, exportBundle } = queue.shift();
+
+                // If bundle export is requested, export directly (not as blob for batch)
+                if (exportBundle) {
+                    const promise = exportSingleChat(chat, { includeCharacter, exportBundle: true })
+                        .then(result => {
+                            inProgress.delete(promise);
+                            return { ...result, isBundleExport: true };
+                        });
+                    inProgress.add(promise);
+                } else {
+                    const promise = exportSingleChatToBlob(chat, includeCharacter)
+                        .then(result => {
+                            inProgress.delete(promise);
+                            return result;
+                        });
+                    inProgress.add(promise);
+                }
             }
 
             if (inProgress.size > 0) {
@@ -540,11 +662,24 @@ export async function exportChatsAsZip(chatExports) {
 
         let exported = 0;
         let failed = 0;
+        let bundleExported = 0;
         const errors = [];
         const includedCharacters = new Set(); // Track which characters we've already added
 
         // Add successful exports to ZIP
         for (const result of results) {
+            // Skip bundle exports (they were downloaded directly)
+            if (result.isBundleExport) {
+                if (result.success) {
+                    bundleExported++;
+                    console.log(`[${MODULE_NAME}] Bundle exported directly (${bundleExported} bundles)`);
+                } else {
+                    failed++;
+                    errors.push(`Bundle export failed: ${result.error || 'Unknown error'}`);
+                }
+                continue;
+            }
+
             if (result.success) {
                 // Add chat file
                 zip.file(result.chatFilename, result.chatBlob);
@@ -570,8 +705,18 @@ export async function exportChatsAsZip(chatExports) {
             }
         }
 
-        if (exported === 0) {
+        if (exported === 0 && bundleExported === 0) {
             throw new Error('No chats were exported successfully');
+        }
+
+        // If only bundle exports, no ZIP needed
+        if (exported === 0 && bundleExported > 0) {
+            toastr.clear(progressToast);
+            toastr.success(
+                `Exported ${bundleExported} chat bundle${bundleExported > 1 ? 's' : ''}`,
+                'RoleOut'
+            );
+            return;
         }
 
         // Generate ZIP file

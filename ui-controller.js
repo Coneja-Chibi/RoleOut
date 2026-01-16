@@ -214,6 +214,9 @@ function createItemOptionsPanel(type, item) {
 
     switch (type) {
         case 'characters':
+            // Include current configuration (preset, settings, attached lorebooks)
+            optionsGroup.append(createOptionCheckbox(`char_config_${item.id}`, 'Include Current Configuration', false));
+
             // Only show checkboxes for features that actually exist
             if (item.hasAvatar) {
                 optionsGroup.append(createOptionCheckbox(`char_avatar_${item.id}`, 'Include Avatar', true));
@@ -224,10 +227,6 @@ function createItemOptionsPanel(type, item) {
             if (item.hasLorebook) {
                 const lorebookLabel = `Attached Lorebook: ${item.lorebookName}`;
                 optionsGroup.append(createOptionCheckbox(`char_lorebook_${item.id}`, lorebookLabel, true));
-            }
-            // If no options available, show a message
-            if (!item.hasAvatar && !item.hasAltGreetings && !item.hasLorebook) {
-                optionsGroup.append($('<div class="rolecall-no-options">No additional options available</div>'));
             }
             break;
         case 'chats':

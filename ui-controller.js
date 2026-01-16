@@ -234,14 +234,12 @@ function createItemOptionsPanel(type, item) {
             optionsGroup.append(createOptionCheckbox(`chat_character_${item.id}`, 'Include Character', true));
             break;
         case 'presets':
-            optionsGroup.append(createOptionCheckbox(`preset_prompts_${item.id}`, 'Include Prompts', true));
-            optionsGroup.append(createOptionCheckbox(`preset_settings_${item.id}`, 'Include Settings', true));
-            optionsGroup.append(createOptionCheckbox(`preset_samplers_${item.id}`, 'Include Samplers', false));
+            // No options needed - presets always export with all their data
+            optionsGroup.append($('<div class="rolecall-no-options">Presets export with all prompts and settings</div>'));
             break;
         case 'lorebooks':
-            optionsGroup.append(createOptionCheckbox(`lore_entries_${item.id}`, 'Include Entries', true));
-            optionsGroup.append(createOptionCheckbox(`lore_categories_${item.id}`, 'Include Categories', true));
-            optionsGroup.append(createOptionCheckbox(`lore_global_${item.id}`, 'Include Global', false));
+            // No options needed - lorebooks always export with all their entries
+            optionsGroup.append($('<div class="rolecall-no-options">Lorebooks export with all entries</div>'));
             break;
     }
 

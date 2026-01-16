@@ -13,6 +13,10 @@ import {
     getSelectedItems,
     updateExportSelectedButton
 } from './ui-controller.js';
+import {
+    exportSingleCharacter,
+    exportCharactersAsZip
+} from './export-manager.js';
 
 const extensionName = 'RoleOut';
 
@@ -157,9 +161,17 @@ function getItemExportOptions(itemWrapper, type) {
  * @param {number} id - Item ID
  * @param {Object} options - Export options
  */
-function exportSingleItem(type, id, options = {}) {
+async function exportSingleItem(type, id, options = {}) {
     console.log(`[RoleOut] Exporting ${type} item:`, id, 'with options:', options);
-    toastr.info(`Exporting ${type} will be implemented soon!`, 'RoleOut');
+
+    // For now, only characters are implemented
+    if (type === 'characters') {
+        // Default format is JSON (RoleCall-compatible)
+        const format = 'json';
+        await exportSingleCharacter(id, format);
+    } else {
+        toastr.info(`Exporting ${type} will be implemented soon!`, 'RoleOut');
+    }
 }
 
 /**
@@ -167,7 +179,15 @@ function exportSingleItem(type, id, options = {}) {
  * @param {string} type - Content type
  * @param {number[]} ids - Array of item IDs
  */
-function exportSelectedItems(type, ids) {
+async function exportSelectedItems(type, ids) {
     console.log(`[RoleOut] Exporting ${ids.length} ${type} items:`, ids);
-    toastr.info(`Batch export of ${ids.length} ${type} will be implemented soon!`, 'RoleOut');
+
+    // For now, only characters are implemented
+    if (type === 'characters') {
+        // Default format is JSON (RoleCall-compatible)
+        const format = 'json';
+        await exportCharactersAsZip(ids, format);
+    } else {
+        toastr.info(`Batch export of ${ids.length} ${type} will be implemented soon!`, 'RoleOut');
+    }
 }

@@ -12,6 +12,7 @@ RoleOut/
 ├── data-providers.js     # Data access layer
 ├── ui-controller.js      # View layer (UI updates)
 ├── event-handlers.js     # Controller layer (user interactions)
+├── export-manager.js     # Export business logic
 ├── settings-manager.js   # Configuration management
 ├── settings.html         # UI template
 ├── style.css            # Styles
@@ -50,7 +51,16 @@ Functions:
 Functions:
 - `bindEventHandlers()` - Main binding function
 - Click handlers for panels, buttons, items
-- Export functions (stub implementations)
+- Export orchestration (delegates to export-manager)
+
+### `export-manager.js` - Export Business Logic
+**Single Responsibility:** Handle character export functionality
+
+Functions:
+- `exportSingleCharacter()` - Export single character as JSON/PNG
+- `exportCharactersAsZip()` - Bulk export characters as ZIP file
+- Uses JSZip library for ZIP creation
+- Calls SillyTavern's `/api/characters/export` endpoint
 
 ### `settings-manager.js` - Configuration Management
 **Single Responsibility:** Manage extension settings

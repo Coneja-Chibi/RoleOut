@@ -960,6 +960,17 @@
     height: 14px;
 }
 
+.rolecall-no-options {
+    padding: 12px;
+    text-align: center;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor) 60%, transparent);
+    font-size: 0.85rem;
+    font-style: italic;
+    background: color-mix(in srgb, var(--rolecall-accent) 4%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--rolecall-accent) 20%, transparent);
+    border-radius: 0;
+}
+
 /* RESPONSIVE ADJUSTMENTS */
 @media (max-width: 767px) {
     .rolecall-status-panels {

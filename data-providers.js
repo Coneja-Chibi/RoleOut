@@ -19,11 +19,27 @@ export function getCharacterList() {
             return [];
         }
 
-        return characters.map((char, index) => ({
-            id: index,
-            name: char.name || char?.data?.name || 'Unnamed Character',
-            avatar: char.avatar
-        }));
+        return characters.map((char, index) => {
+            // Check for alternate greetings
+            const altGreetings = char.data?.alternate_greetings || char.alternate_greetings || [];
+            const hasAltGreetings = Array.isArray(altGreetings) && altGreetings.length > 0;
+
+            // Check for attached lorebook
+            const characterBook = char.data?.character_book || char.character_book;
+            const hasLorebook = characterBook && (
+                (Array.isArray(characterBook.entries) && characterBook.entries.length > 0) ||
+                characterBook.name
+            );
+
+            return {
+                id: index,
+                name: char.name || char?.data?.name || 'Unnamed Character',
+                avatar: char.avatar,
+                hasAvatar: !!char.avatar,
+                hasAltGreetings,
+                hasLorebook
+            };
+        });
     } catch (error) {
         console.error('[RoleOut] Error getting character list:', error);
         return [];

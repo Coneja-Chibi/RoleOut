@@ -174,7 +174,7 @@ function createListItemElement(type, item) {
     itemWrapper.append(itemEl);
 
     // Create expandable options panel (same structure as global options)
-    const optionsPanel = createItemOptionsPanel(type, item.id);
+    const optionsPanel = createItemOptionsPanel(type, item);
     itemWrapper.append(optionsPanel);
 
     return itemWrapper;
@@ -201,12 +201,12 @@ function createAvatarElement(item) {
 /**
  * Create expandable options panel for a single item
  * @param {string} type - Content type
- * @param {number} itemId - Item ID
+ * @param {Object} item - Item data with conditional properties
  * @returns {jQuery} Options panel element
  */
-function createItemOptionsPanel(type, itemId) {
+function createItemOptionsPanel(type, item) {
     const panel = $('<div class="rolecall-item-options"></div>');
-    panel.attr('data-item-id', itemId);
+    panel.attr('data-item-id', item.id);
     panel.hide(); // Hidden by default
 
     // Create checkboxes based on type
@@ -214,24 +214,35 @@ function createItemOptionsPanel(type, itemId) {
 
     switch (type) {
         case 'characters':
-            optionsGroup.append(createOptionCheckbox(`char_avatar_${itemId}`, 'Include Avatar', true));
-            optionsGroup.append(createOptionCheckbox(`char_greetings_${itemId}`, 'Alternate Greetings', true));
-            optionsGroup.append(createOptionCheckbox(`char_lorebook_${itemId}`, 'Attached Lorebook', true));
+            // Only show checkboxes for features that actually exist
+            if (item.hasAvatar) {
+                optionsGroup.append(createOptionCheckbox(`char_avatar_${item.id}`, 'Include Avatar', true));
+            }
+            if (item.hasAltGreetings) {
+                optionsGroup.append(createOptionCheckbox(`char_greetings_${item.id}`, 'Alternate Greetings', true));
+            }
+            if (item.hasLorebook) {
+                optionsGroup.append(createOptionCheckbox(`char_lorebook_${item.id}`, 'Attached Lorebook', true));
+            }
+            // If no options available, show a message
+            if (!item.hasAvatar && !item.hasAltGreetings && !item.hasLorebook) {
+                optionsGroup.append($('<div class="rolecall-no-options">No additional options available</div>'));
+            }
             break;
         case 'chats':
-            optionsGroup.append(createOptionCheckbox(`chat_swipes_${itemId}`, 'Include Swipes', true));
-            optionsGroup.append(createOptionCheckbox(`chat_metadata_${itemId}`, 'Include Metadata', true));
-            optionsGroup.append(createOptionCheckbox(`chat_character_${itemId}`, 'Include Character', false));
+            optionsGroup.append(createOptionCheckbox(`chat_swipes_${item.id}`, 'Include Swipes', true));
+            optionsGroup.append(createOptionCheckbox(`chat_metadata_${item.id}`, 'Include Metadata', true));
+            optionsGroup.append(createOptionCheckbox(`chat_character_${item.id}`, 'Include Character', false));
             break;
         case 'presets':
-            optionsGroup.append(createOptionCheckbox(`preset_prompts_${itemId}`, 'Include Prompts', true));
-            optionsGroup.append(createOptionCheckbox(`preset_settings_${itemId}`, 'Include Settings', true));
-            optionsGroup.append(createOptionCheckbox(`preset_samplers_${itemId}`, 'Include Samplers', false));
+            optionsGroup.append(createOptionCheckbox(`preset_prompts_${item.id}`, 'Include Prompts', true));
+            optionsGroup.append(createOptionCheckbox(`preset_settings_${item.id}`, 'Include Settings', true));
+            optionsGroup.append(createOptionCheckbox(`preset_samplers_${item.id}`, 'Include Samplers', false));
             break;
         case 'lorebooks':
-            optionsGroup.append(createOptionCheckbox(`lore_entries_${itemId}`, 'Include Entries', true));
-            optionsGroup.append(createOptionCheckbox(`lore_categories_${itemId}`, 'Include Categories', true));
-            optionsGroup.append(createOptionCheckbox(`lore_global_${itemId}`, 'Include Global', false));
+            optionsGroup.append(createOptionCheckbox(`lore_entries_${item.id}`, 'Include Entries', true));
+            optionsGroup.append(createOptionCheckbox(`lore_categories_${item.id}`, 'Include Categories', true));
+            optionsGroup.append(createOptionCheckbox(`lore_global_${item.id}`, 'Include Global', false));
             break;
     }
 
@@ -240,7 +251,7 @@ function createItemOptionsPanel(type, itemId) {
     // Export button for this specific item
     const exportBtn = $('<button class="rolecall-export-btn rolecall-export-single"></button>');
     exportBtn.attr('data-type', type);
-    exportBtn.attr('data-id', itemId);
+    exportBtn.attr('data-id', item.id);
     exportBtn.html('<img src="scripts/extensions/third-party/RoleOut/icons/download.svg" alt="" width="16" height="16"> Export This Item');
     panel.append(exportBtn);
 

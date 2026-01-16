@@ -14,8 +14,11 @@ export async function updateStatusCounts() {
 
         console.log('[RoleOut] Updating counts:', counts);
 
+        // Update character count
+        const charText = `${counts.characters} character${counts.characters !== 1 ? 's' : ''} detected`;
+        console.log('[RoleOut] Setting character count to:', charText);
         $('#rolecall-panel-characters .rolecall-status-value')
-            .text(`${counts.characters} character${counts.characters !== 1 ? 's' : ''} detected`);
+            .text(charText);
 
         $('#rolecall-panel-chats .rolecall-status-value')
             .text(`${counts.chats} chat${counts.chats !== 1 ? 's' : ''} detected`);

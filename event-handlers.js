@@ -136,8 +136,17 @@ function bindExportHandlers() {
  * Bind global event listeners
  */
 function bindGlobalEvents() {
+    // Update counts when character list changes
     $(document).on('characterSelected', updateStatusCounts);
     $(document).on('chatLoaded', updateStatusCounts);
+
+    // Update counts when characters are initially loaded
+    import('../../../extensions.js').then(({ eventSource, event_types }) => {
+        eventSource.on(event_types.CHARACTER_PAGE_LOADED, () => {
+            console.log('[RoleOut] Characters loaded, updating counts');
+            updateStatusCounts();
+        });
+    });
 }
 
 

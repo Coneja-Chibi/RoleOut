@@ -231,9 +231,7 @@ function createItemOptionsPanel(type, item) {
             }
             break;
         case 'chats':
-            optionsGroup.append(createOptionCheckbox(`chat_swipes_${item.id}`, 'Include Swipes', true));
-            optionsGroup.append(createOptionCheckbox(`chat_metadata_${item.id}`, 'Include Metadata', true));
-            optionsGroup.append(createOptionCheckbox(`chat_character_${item.id}`, 'Include Character', false));
+            optionsGroup.append(createOptionCheckbox(`chat_character_${item.id}`, 'Include Character', true));
             break;
         case 'presets':
             optionsGroup.append(createOptionCheckbox(`preset_prompts_${item.id}`, 'Include Prompts', true));

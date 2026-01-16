@@ -294,3 +294,112 @@ export async function exportCharactersAsZip(characterIds, format = 'json') {
         }
     }
 }
+
+/**
+ * Export a single chat from SillyTavern
+ * @param {Object} chat - Chat object with file_name and avatar properties
+ * @param {Object} options - Export options (includeCharacter, etc.)
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function exportSingleChat(chat, options = {}) {
+    try {
+        console.log(`[${MODULE_NAME}] Exporting chat: ${chat.file_name}`, options);
+
+        const includeCharacter = options.includeCharacter !== false; // Default true
+
+        // If including character, export as ZIP with chat + character card
+        if (includeCharacter && chat.avatar) {
+            const JSZip = await loadJSZip();
+            const zip = new JSZip();
+
+            // Export chat as JSONL
+            const chatResponse = await fetch('/api/chats/export', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({
+                    file: chat.file_name,
+                    avatar_url: chat.avatar,
+                    format: 'jsonl',
+                    exportfilename: `${chat.file_name}.jsonl`
+                }),
+            });
+
+            if (!chatResponse.ok) {
+                throw new Error(`Chat export failed: HTTP ${chatResponse.status}`);
+            }
+
+            const chatData = await chatResponse.json();
+            if (!chatData.result) {
+                throw new Error('Chat export returned no data');
+            }
+
+            // Add chat to ZIP
+            const chatFilename = getSafeFilename(chat.file_name, 'jsonl');
+            zip.file(chatFilename, chatData.result);
+
+            // Export character as PNG (V2 card with embedded image)
+            const charResponse = await fetch('/api/characters/export', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({
+                    format: 'png',
+                    avatar_url: chat.avatar
+                }),
+            });
+
+            if (!charResponse.ok) {
+                throw new Error(`Character export failed: HTTP ${charResponse.status}`);
+            }
+
+            const charBlob = await charResponse.blob();
+            const charFilename = getSafeFilename(chat.avatar, 'png');
+            zip.file(charFilename, charBlob);
+
+            // Generate and download ZIP
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const timestamp = getTimestampForFilename();
+            const zipFilename = `RoleOut_Chat_${getSafeFilename(chat.file_name, '')}_${timestamp}.zip`;
+            downloadBlob(zipBlob, zipFilename);
+
+            console.log(`[${MODULE_NAME}] Successfully exported chat with character: ${zipFilename}`);
+            toastr.success(`Exported chat with character`, 'RoleOut');
+            return { success: true };
+
+        } else {
+            // Export just the chat as JSONL
+            const response = await fetch('/api/chats/export', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({
+                    file: chat.file_name,
+                    avatar_url: chat.avatar,
+                    format: 'jsonl',
+                    exportfilename: `${chat.file_name}.jsonl`
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Chat export failed: HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (!data.result) {
+                throw new Error('Chat export returned no data');
+            }
+
+            // Download as JSONL file
+            const blob = new Blob([data.result], { type: 'application/jsonl' });
+            const filename = getSafeFilename(chat.file_name, 'jsonl');
+            downloadBlob(blob, filename);
+
+            console.log(`[${MODULE_NAME}] Successfully exported chat: ${filename}`);
+            toastr.success(`Exported ${chat.file_name}`, 'RoleOut');
+            return { success: true };
+        }
+
+    } catch (error) {
+        console.error(`[${MODULE_NAME}] Chat export failed:`, error);
+        toastr.error(`Failed to export chat: ${error.message}`, 'RoleOut');
+        return { success: false, error: error.message };
+    }
+}

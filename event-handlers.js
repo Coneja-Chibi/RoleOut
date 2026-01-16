@@ -15,7 +15,8 @@ import {
 } from './ui-controller.js';
 import {
     exportSingleCharacter,
-    exportCharactersAsZip
+    exportCharactersAsZip,
+    exportSingleChat
 } from './export-manager.js';
 
 const extensionName = 'RoleOut';
@@ -164,11 +165,22 @@ function getItemExportOptions(itemWrapper, type) {
 async function exportSingleItem(type, id, options = {}) {
     console.log(`[RoleOut] Exporting ${type} item:`, id, 'with options:', options);
 
-    // For now, only characters are implemented
     if (type === 'characters') {
         // Default format is JSON (RoleCall-compatible)
         const format = 'json';
         await exportSingleCharacter(id, format);
+    } else if (type === 'chats') {
+        // Get the chat data from the data provider
+        const { getChatList } = await import('./data-providers.js');
+        const chats = await getChatList();
+        const chat = chats.find(c => c.id === id);
+
+        if (!chat) {
+            toastr.error('Chat not found', 'RoleOut');
+            return;
+        }
+
+        await exportSingleChat(chat, options);
     } else {
         toastr.info(`Exporting ${type} will be implemented soon!`, 'RoleOut');
     }

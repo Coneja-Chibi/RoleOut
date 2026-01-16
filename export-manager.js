@@ -403,3 +403,208 @@ export async function exportSingleChat(chat, options = {}) {
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Export a single chat to blob (helper for batch export)
+ * @param {Object} chat - Chat object
+ * @param {boolean} includeCharacter - Whether to include character
+ * @returns {Promise<{success: boolean, chatFilename?: string, chatBlob?: Blob, charFilename?: string, charBlob?: Blob, error?: string}>}
+ */
+async function exportSingleChatToBlob(chat, includeCharacter) {
+    try {
+        // Export chat as JSONL
+        const chatResponse = await fetch('/api/chats/export', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            body: JSON.stringify({
+                file: chat.file_name,
+                avatar_url: chat.avatar,
+                format: 'jsonl',
+                exportfilename: `${chat.file_name}.jsonl`
+            }),
+        });
+
+        if (!chatResponse.ok) {
+            throw new Error(`HTTP ${chatResponse.status}`);
+        }
+
+        const chatData = await chatResponse.json();
+        if (!chatData.result) {
+            throw new Error('No data returned');
+        }
+
+        const chatBlob = new Blob([chatData.result], { type: 'application/jsonl' });
+        const chatFilename = getSafeFilename(chat.file_name, 'jsonl');
+
+        // If not including character or no avatar, just return chat
+        if (!includeCharacter || !chat.avatar) {
+            return {
+                success: true,
+                chatFilename,
+                chatBlob,
+                avatarUrl: chat.avatar // For deduplication
+            };
+        }
+
+        // Export character as PNG
+        const charResponse = await fetch('/api/characters/export', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            body: JSON.stringify({
+                format: 'png',
+                avatar_url: chat.avatar
+            }),
+        });
+
+        if (!charResponse.ok) {
+            // Character export failed, still return chat but log warning
+            console.warn(`[${MODULE_NAME}] Character export failed for ${chat.avatar}, exporting chat only`);
+            return {
+                success: true,
+                chatFilename,
+                chatBlob,
+                avatarUrl: chat.avatar
+            };
+        }
+
+        const charBlob = await charResponse.blob();
+        const charFilename = getSafeFilename(chat.avatar, 'png');
+
+        return {
+            success: true,
+            chatFilename,
+            chatBlob,
+            charFilename,
+            charBlob,
+            avatarUrl: chat.avatar // For deduplication
+        };
+
+    } catch (error) {
+        console.error(`[${MODULE_NAME}] Failed to export chat ${chat.file_name}:`, error);
+        return {
+            success: false,
+            error: error.message,
+            chatName: chat.file_name
+        };
+    }
+}
+
+/**
+ * Batch export chats with concurrency limit and per-chat character inclusion options
+ * @param {Array<{chat: Object, includeCharacter: boolean}>} chatExports - Array of chat export configs
+ * @returns {Promise<{success: boolean, exported: number, failed: number, errors?: Array}>}
+ */
+export async function exportChatsAsZip(chatExports) {
+    let progressToast = null;
+
+    try {
+        console.log(`[${MODULE_NAME}] Batch export: ${chatExports.length} chats`);
+
+        if (chatExports.length === 0) {
+            throw new Error('No chats selected for export');
+        }
+
+        // Show progress toast
+        progressToast = toastr.info(
+            `Preparing ${chatExports.length} chat${chatExports.length > 1 ? 's' : ''}...`,
+            'RoleOut',
+            { timeOut: 0, extendedTimeOut: 0 }
+        );
+
+        // Load JSZip
+        const JSZip = await loadJSZip();
+        const zip = new JSZip();
+
+        // Batch export with concurrency control
+        const results = [];
+        const queue = [...chatExports];
+        const inProgress = new Set();
+
+        while (queue.length > 0 || inProgress.size > 0) {
+            while (inProgress.size < MAX_CONCURRENT_EXPORTS && queue.length > 0) {
+                const { chat, includeCharacter } = queue.shift();
+                const promise = exportSingleChatToBlob(chat, includeCharacter)
+                    .then(result => {
+                        inProgress.delete(promise);
+                        return result;
+                    });
+                inProgress.add(promise);
+            }
+
+            if (inProgress.size > 0) {
+                const result = await Promise.race(inProgress);
+                results.push(result);
+            }
+        }
+
+        let exported = 0;
+        let failed = 0;
+        const errors = [];
+        const includedCharacters = new Set(); // Track which characters we've already added
+
+        // Add successful exports to ZIP
+        for (const result of results) {
+            if (result.success) {
+                // Add chat file
+                zip.file(result.chatFilename, result.chatBlob);
+                exported++;
+
+                // Add character file (only once per unique character)
+                if (result.charBlob && result.charFilename && result.avatarUrl) {
+                    if (!includedCharacters.has(result.avatarUrl)) {
+                        zip.file(result.charFilename, result.charBlob);
+                        includedCharacters.add(result.avatarUrl);
+                        console.log(`[${MODULE_NAME}] Added character: ${result.charFilename}`);
+                    } else {
+                        console.log(`[${MODULE_NAME}] Skipped duplicate character: ${result.charFilename}`);
+                    }
+                }
+
+                console.log(`[${MODULE_NAME}] Added chat: ${result.chatFilename} (${exported}/${chatExports.length})`);
+            } else {
+                failed++;
+                const errorMsg = `${result.chatName}: ${result.error || 'Unknown error'}`;
+                errors.push(errorMsg);
+                console.warn(`[${MODULE_NAME}] ${errorMsg}`);
+            }
+        }
+
+        if (exported === 0) {
+            throw new Error('No chats were exported successfully');
+        }
+
+        // Generate ZIP file
+        if (progressToast) {
+            toastr.clear(progressToast);
+        }
+        progressToast = toastr.info('Creating ZIP file...', 'RoleOut', { timeOut: 0, extendedTimeOut: 0 });
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+        // Download ZIP
+        const timestamp = getTimestampForFilename();
+        const zipFilename = `RoleOut_Chats_${timestamp}.zip`;
+        downloadBlob(zipBlob, zipFilename);
+
+        console.log(`[${MODULE_NAME}] Successfully created ${zipFilename} (${exported} chats, ${includedCharacters.size} unique characters)`);
+
+        // Show success message with details
+        const message = failed > 0
+            ? `Exported ${exported} chat${exported > 1 ? 's' : ''} (${failed} failed)`
+            : `Exported ${exported} chat${exported > 1 ? 's' : ''}`;
+
+        toastr.success(message, zipFilename, { timeOut: 5000 });
+
+        return { success: true, exported, failed, errors: failed > 0 ? errors : undefined };
+
+    } catch (error) {
+        console.error(`[${MODULE_NAME}] Batch chat export failed:`, error);
+        toastr.error(`Batch export failed: ${error.message}`, 'RoleOut');
+        return { success: false, exported: 0, failed: chatExports.length, errors: [error.message] };
+    } finally {
+        // Always clear progress toast
+        if (progressToast) {
+            toastr.clear(progressToast);
+        }
+    }
+}

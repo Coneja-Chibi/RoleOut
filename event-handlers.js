@@ -16,7 +16,8 @@ import {
 import {
     exportSingleCharacter,
     exportCharactersAsZip,
-    exportSingleChat
+    exportSingleChat,
+    exportChatsAsZip
 } from './export-manager.js';
 
 const extensionName = 'RoleOut';
@@ -194,11 +195,35 @@ async function exportSingleItem(type, id, options = {}) {
 async function exportSelectedItems(type, ids) {
     console.log(`[RoleOut] Exporting ${ids.length} ${type} items:`, ids);
 
-    // For now, only characters are implemented
     if (type === 'characters') {
         // Default format is JSON (RoleCall-compatible)
         const format = 'json';
         await exportCharactersAsZip(ids, format);
+    } else if (type === 'chats') {
+        // Get chat data and their individual options
+        const { getChatList } = await import('./data-providers.js');
+        const allChats = await getChatList();
+
+        const chatExports = ids.map(id => {
+            const chat = allChats.find(c => c.id === id);
+            if (!chat) return null;
+
+            // Get the "Include Character" checkbox state for this specific chat
+            const includeCharacterCheckbox = $(`#chat_character_${id}`);
+            const includeCharacter = includeCharacterCheckbox.length ? includeCharacterCheckbox.prop('checked') : true;
+
+            return {
+                chat,
+                includeCharacter
+            };
+        }).filter(Boolean); // Remove nulls
+
+        if (chatExports.length === 0) {
+            toastr.error('No valid chats found to export', 'RoleOut');
+            return;
+        }
+
+        await exportChatsAsZip(chatExports);
     } else {
         toastr.info(`Batch export of ${ids.length} ${type} will be implemented soon!`, 'RoleOut');
     }

@@ -1,0 +1,220 @@
+<div id="rolecall_settings" class="rolecall-extension-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>🎭 RoleOut</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+
+            <!-- Status Panels Grid -->
+            <div class="rolecall-status-section">
+                <div class="rolecall-status-panels">
+
+                    <!-- Characters Export Panel -->
+                    <div class="rolecall-status-panel rolecall-clickable" id="rolecall-panel-characters">
+                        <div class="rolecall-status-icon">
+                            <img src="scripts/extensions/third-party/RoleOut/icons/user-circle.svg" alt="Characters" width="24" height="24">
+                        </div>
+                        <div class="rolecall-status-content">
+                            <div class="rolecall-status-title">Characters</div>
+                            <div class="rolecall-status-value">Ready to export</div>
+                            <div class="rolecall-status-detail">Click to configure</div>
+                        </div>
+                        <div class="rolecall-status-indicator"></div>
+                        <div class="rolecall-click-hint">
+                            <i class="fa-solid fa-mouse-pointer"></i>
+                        </div>
+                    </div>
+
+                    <!-- Chats Export Panel -->
+                    <div class="rolecall-status-panel rolecall-clickable" id="rolecall-panel-chats">
+                        <div class="rolecall-status-icon">
+                            <img src="scripts/extensions/third-party/RoleOut/icons/comments.svg" alt="Chats" width="24" height="24">
+                        </div>
+                        <div class="rolecall-status-content">
+                            <div class="rolecall-status-title">Chats</div>
+                            <div class="rolecall-status-value">Ready to export</div>
+                            <div class="rolecall-status-detail">Click to configure</div>
+                        </div>
+                        <div class="rolecall-status-indicator"></div>
+                        <div class="rolecall-click-hint">
+                            <i class="fa-solid fa-mouse-pointer"></i>
+                        </div>
+                    </div>
+
+                    <!-- Presets Export Panel -->
+                    <div class="rolecall-status-panel rolecall-clickable" id="rolecall-panel-presets">
+                        <div class="rolecall-status-icon">
+                            <img src="scripts/extensions/third-party/RoleOut/icons/sliders.svg" alt="Presets" width="24" height="24">
+                        </div>
+                        <div class="rolecall-status-content">
+                            <div class="rolecall-status-title">Presets</div>
+                            <div class="rolecall-status-value">Ready to export</div>
+                            <div class="rolecall-status-detail">Click to configure</div>
+                        </div>
+                        <div class="rolecall-status-indicator"></div>
+                        <div class="rolecall-click-hint">
+                            <i class="fa-solid fa-mouse-pointer"></i>
+                        </div>
+                    </div>
+
+                    <!-- Lorebooks Export Panel -->
+                    <div class="rolecall-status-panel rolecall-clickable" id="rolecall-panel-lorebooks">
+                        <div class="rolecall-status-icon">
+                            <img src="scripts/extensions/third-party/RoleOut/icons/book-open.svg" alt="Lorebooks" width="24" height="24">
+                        </div>
+                        <div class="rolecall-status-content">
+                            <div class="rolecall-status-title">Lorebooks</div>
+                            <div class="rolecall-status-value">Ready to export</div>
+                            <div class="rolecall-status-detail">Click to configure</div>
+                        </div>
+                        <div class="rolecall-status-indicator"></div>
+                        <div class="rolecall-click-hint">
+                            <i class="fa-solid fa-mouse-pointer"></i>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Expandable Options Cards (initially hidden) -->
+
+            <!-- Characters Options -->
+            <div class="rolecall-options-card" id="rolecall-options-characters" style="display: none;">
+                <div class="rolecall-options-header">
+                    <div class="rolecall-options-title">
+                        <img src="scripts/extensions/third-party/RoleOut/icons/user-circle.svg" alt="" width="20" height="20">
+                        <span>Character Export Options</span>
+                    </div>
+                    <button class="rolecall-close-options" data-target="characters">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="rolecall-options-body">
+                    <!-- Search and Multi-Select Controls -->
+                    <div class="rolecall-controls-row">
+                        <div class="rolecall-search-container">
+                            <input type="text" class="rolecall-search-input" id="rolecall-search-characters" placeholder="Search characters...">
+                        </div>
+                        <button class="rolecall-multi-select-btn" data-type="characters" title="Toggle multi-select mode">
+                            <i class="fa-solid fa-check-square"></i>
+                            <span>Select Multiple</span>
+                        </button>
+                    </div>
+
+                    <!-- Export Selected Button (hidden by default) -->
+                    <button class="rolecall-export-selected-btn" id="rolecall-export-selected-characters" data-type="characters" style="display: none;" disabled>
+                        <i class="fa-solid fa-download"></i>
+                        Export Selected
+                    </button>
+
+                    <!-- Item List -->
+                    <div class="rolecall-item-list" id="rolecall-list-characters"></div>
+                </div>
+            </div>
+
+            <!-- Chats Options -->
+            <div class="rolecall-options-card" id="rolecall-options-chats" style="display: none;">
+                <div class="rolecall-options-header">
+                    <div class="rolecall-options-title">
+                        <img src="scripts/extensions/third-party/RoleOut/icons/comments.svg" alt="" width="20" height="20">
+                        <span>Chat Export Options</span>
+                    </div>
+                    <button class="rolecall-close-options" data-target="chats">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="rolecall-options-body">
+                    <!-- Search and Multi-Select Controls -->
+                    <div class="rolecall-controls-row">
+                        <div class="rolecall-search-container">
+                            <input type="text" class="rolecall-search-input" id="rolecall-search-chats" placeholder="Search chats...">
+                        </div>
+                        <button class="rolecall-multi-select-btn" data-type="chats" title="Toggle multi-select mode">
+                            <i class="fa-solid fa-check-square"></i>
+                            <span>Select Multiple</span>
+                        </button>
+                    </div>
+
+                    <!-- Export Selected Button (hidden by default) -->
+                    <button class="rolecall-export-selected-btn" id="rolecall-export-selected-chats" data-type="chats" style="display: none;" disabled>
+                        <i class="fa-solid fa-download"></i>
+                        Export Selected
+                    </button>
+
+                    <!-- Item List -->
+                    <div class="rolecall-item-list" id="rolecall-list-chats"></div>
+                </div>
+            </div>
+
+            <!-- Presets Options -->
+            <div class="rolecall-options-card" id="rolecall-options-presets" style="display: none;">
+                <div class="rolecall-options-header">
+                    <div class="rolecall-options-title">
+                        <img src="scripts/extensions/third-party/RoleOut/icons/sliders.svg" alt="" width="20" height="20">
+                        <span>Preset Export Options</span>
+                    </div>
+                    <button class="rolecall-close-options" data-target="presets">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="rolecall-options-body">
+                    <!-- Search and Multi-Select Controls -->
+                    <div class="rolecall-controls-row">
+                        <div class="rolecall-search-container">
+                            <input type="text" class="rolecall-search-input" id="rolecall-search-presets" placeholder="Search presets...">
+                        </div>
+                        <button class="rolecall-multi-select-btn" data-type="presets" title="Toggle multi-select mode">
+                            <i class="fa-solid fa-check-square"></i>
+                            <span>Select Multiple</span>
+                        </button>
+                    </div>
+
+                    <!-- Export Selected Button (hidden by default) -->
+                    <button class="rolecall-export-selected-btn" id="rolecall-export-selected-presets" data-type="presets" style="display: none;" disabled>
+                        <i class="fa-solid fa-download"></i>
+                        Export Selected
+                    </button>
+
+                    <!-- Item List -->
+                    <div class="rolecall-item-list" id="rolecall-list-presets"></div>
+                </div>
+            </div>
+
+            <!-- Lorebooks Options -->
+            <div class="rolecall-options-card" id="rolecall-options-lorebooks" style="display: none;">
+                <div class="rolecall-options-header">
+                    <div class="rolecall-options-title">
+                        <img src="scripts/extensions/third-party/RoleOut/icons/book-open.svg" alt="" width="20" height="20">
+                        <span>Lorebook Export Options</span>
+                    </div>
+                    <button class="rolecall-close-options" data-target="lorebooks">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="rolecall-options-body">
+                    <!-- Search and Multi-Select Controls -->
+                    <div class="rolecall-controls-row">
+                        <div class="rolecall-search-container">
+                            <input type="text" class="rolecall-search-input" id="rolecall-search-lorebooks" placeholder="Search lorebooks...">
+                        </div>
+                        <button class="rolecall-multi-select-btn" data-type="lorebooks" title="Toggle multi-select mode">
+                            <i class="fa-solid fa-check-square"></i>
+                            <span>Select Multiple</span>
+                        </button>
+                    </div>
+
+                    <!-- Export Selected Button (hidden by default) -->
+                    <button class="rolecall-export-selected-btn" id="rolecall-export-selected-lorebooks" data-type="lorebooks" style="display: none;" disabled>
+                        <i class="fa-solid fa-download"></i>
+                        Export Selected
+                    </button>
+
+                    <!-- Item List -->
+                    <div class="rolecall-item-list" id="rolecall-list-lorebooks"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>

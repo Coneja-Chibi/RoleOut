@@ -17,7 +17,9 @@ import {
     exportSingleCharacter,
     exportCharactersAsZip,
     exportSingleChat,
-    exportChatsAsZip
+    exportChatsAsZip,
+    exportSinglePersona,
+    exportPersonasAsZip
 } from './export-manager.js';
 
 const extensionName = 'RoleOut';
@@ -41,6 +43,7 @@ function bindStatusPanelHandlers() {
     $('#rolecall-panel-chats').on('click', () => toggleOptionsCard('chats'));
     $('#rolecall-panel-presets').on('click', () => toggleOptionsCard('presets'));
     $('#rolecall-panel-lorebooks').on('click', () => toggleOptionsCard('lorebooks'));
+    $('#rolecall-panel-personas').on('click', () => toggleOptionsCard('personas'));
 }
 
 /**
@@ -182,6 +185,8 @@ async function exportSingleItem(type, id, options = {}) {
         }
 
         await exportSingleChat(chat, options);
+    } else if (type === 'personas') {
+        await exportSinglePersona(id);
     } else {
         toastr.info(`Exporting ${type} will be implemented soon!`, 'RoleOut');
     }
@@ -224,6 +229,8 @@ async function exportSelectedItems(type, ids) {
         }
 
         await exportChatsAsZip(chatExports);
+    } else if (type === 'personas') {
+        await exportPersonasAsZip(ids);
     } else {
         toastr.info(`Batch export of ${ids.length} ${type} will be implemented soon!`, 'RoleOut');
     }

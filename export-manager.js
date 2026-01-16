@@ -4,7 +4,7 @@
  */
 
 import { getRequestHeaders } from '../../../../script.js';
-import { getCharacterList } from './data-providers.js';
+import { getCharacterList, getPersonaList } from './data-providers.js';
 
 const MODULE_NAME = 'RoleOut-Export';
 const MAX_CONCURRENT_EXPORTS = 5; // Don't hammer the server
@@ -601,6 +601,197 @@ export async function exportChatsAsZip(chatExports) {
         console.error(`[${MODULE_NAME}] Batch chat export failed:`, error);
         toastr.error(`Batch export failed: ${error.message}`, 'RoleOut');
         return { success: false, exported: 0, failed: chatExports.length, errors: [error.message] };
+    } finally {
+        // Always clear progress toast
+        if (progressToast) {
+            toastr.clear(progressToast);
+        }
+    }
+}
+
+/**
+ * Export a single persona from SillyTavern
+ * Personas are exported as JSON files with avatar and metadata
+ * @param {number} personaId - Persona ID (index in getPersonaList())
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function exportSinglePersona(personaId) {
+    try {
+        console.log(`[${MODULE_NAME}] Exporting persona: ${personaId}`);
+
+        const personas = getPersonaList();
+        const persona = personas.find(p => p.id === personaId);
+
+        if (!persona) {
+            throw new Error('Persona not found');
+        }
+
+        // Fetch the avatar image as base64
+        let avatarBase64 = null;
+        if (persona.avatar) {
+            try {
+                const avatarResponse = await fetch(`/User Avatars/${persona.avatar}`);
+                if (avatarResponse.ok) {
+                    const blob = await avatarResponse.blob();
+                    avatarBase64 = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result.split(',')[1]); // Remove data:image/png;base64, prefix
+                        reader.readAsDataURL(blob);
+                    });
+                }
+            } catch (err) {
+                console.warn(`[${MODULE_NAME}] Failed to fetch persona avatar:`, err);
+            }
+        }
+
+        // Create persona export object
+        const personaExport = {
+            name: persona.name,
+            description: persona.description || '',
+            title: persona.title || '',
+            avatar: persona.avatar,
+            avatarBase64: avatarBase64,
+            isDefault: persona.isDefault,
+            exportedAt: new Date().toISOString(),
+            exportedBy: 'RoleOut'
+        };
+
+        // Download as JSON file
+        const jsonString = JSON.stringify(personaExport, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const filename = getSafeFilename(persona.avatar || persona.name, 'json');
+        downloadBlob(blob, filename);
+
+        console.log(`[${MODULE_NAME}] Successfully exported persona: ${filename}`);
+        toastr.success(`Exported ${persona.name}`, 'RoleOut');
+        return { success: true };
+
+    } catch (error) {
+        console.error(`[${MODULE_NAME}] Persona export failed:`, error);
+        toastr.error(`Failed to export persona: ${error.message}`, 'RoleOut');
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Export personas as ZIP file
+ * @param {number[]} personaIds - Array of persona IDs
+ * @returns {Promise<{success: boolean, exported: number, failed: number, errors?: Array}>}
+ */
+export async function exportPersonasAsZip(personaIds) {
+    let progressToast = null;
+
+    try {
+        console.log(`[${MODULE_NAME}] Batch export: ${personaIds.length} personas`);
+
+        if (personaIds.length === 0) {
+            throw new Error('No personas selected for export');
+        }
+
+        // Show progress toast
+        progressToast = toastr.info(
+            `Preparing ${personaIds.length} persona${personaIds.length > 1 ? 's' : ''}...`,
+            'RoleOut',
+            { timeOut: 0, extendedTimeOut: 0 }
+        );
+
+        // Load JSZip
+        const JSZip = await loadJSZip();
+        const zip = new JSZip();
+
+        const personas = getPersonaList();
+        let exported = 0;
+        let failed = 0;
+        const errors = [];
+
+        // Export each persona
+        for (const id of personaIds) {
+            try {
+                const persona = personas.find(p => p.id === id);
+                if (!persona) {
+                    throw new Error(`Persona ${id} not found`);
+                }
+
+                // Fetch avatar if available
+                let avatarBase64 = null;
+                if (persona.avatar) {
+                    try {
+                        const avatarResponse = await fetch(`/User Avatars/${persona.avatar}`);
+                        if (avatarResponse.ok) {
+                            const blob = await avatarResponse.blob();
+                            avatarBase64 = await new Promise((resolve) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                                reader.readAsDataURL(blob);
+                            });
+
+                            // Add avatar image to ZIP
+                            const avatarBlob = await avatarResponse.blob();
+                            zip.file(persona.avatar, avatarBlob);
+                        }
+                    } catch (err) {
+                        console.warn(`[${MODULE_NAME}] Failed to fetch avatar for ${persona.name}:`, err);
+                    }
+                }
+
+                // Create persona metadata JSON
+                const personaExport = {
+                    name: persona.name,
+                    description: persona.description || '',
+                    title: persona.title || '',
+                    avatar: persona.avatar,
+                    isDefault: persona.isDefault,
+                    exportedAt: new Date().toISOString(),
+                    exportedBy: 'RoleOut'
+                };
+
+                // Add JSON to ZIP
+                const jsonFilename = getSafeFilename(persona.avatar || persona.name, 'json');
+                zip.file(jsonFilename, JSON.stringify(personaExport, null, 2));
+
+                exported++;
+                console.log(`[${MODULE_NAME}] Added persona: ${persona.name} (${exported}/${personaIds.length})`);
+
+            } catch (error) {
+                failed++;
+                const errorMsg = `Persona ${id}: ${error.message}`;
+                errors.push(errorMsg);
+                console.warn(`[${MODULE_NAME}] ${errorMsg}`);
+            }
+        }
+
+        if (exported === 0) {
+            throw new Error('No personas were exported successfully');
+        }
+
+        // Generate ZIP file
+        if (progressToast) {
+            toastr.clear(progressToast);
+        }
+        progressToast = toastr.info('Creating ZIP file...', 'RoleOut', { timeOut: 0, extendedTimeOut: 0 });
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+        // Download ZIP
+        const timestamp = getTimestampForFilename();
+        const zipFilename = `RoleOut_Personas_${timestamp}.zip`;
+        downloadBlob(zipBlob, zipFilename);
+
+        console.log(`[${MODULE_NAME}] Successfully created ${zipFilename} (${exported} personas)`);
+
+        // Show success message with details
+        const message = failed > 0
+            ? `Exported ${exported} persona${exported > 1 ? 's' : ''} (${failed} failed)`
+            : `Exported ${exported} persona${exported > 1 ? 's' : ''}`;
+
+        toastr.success(message, zipFilename, { timeOut: 5000 });
+
+        return { success: true, exported, failed, errors: failed > 0 ? errors : undefined };
+
+    } catch (error) {
+        console.error(`[${MODULE_NAME}] Batch persona export failed:`, error);
+        toastr.error(`Batch export failed: ${error.message}`, 'RoleOut');
+        return { success: false, exported: 0, failed: personaIds.length, errors: [error.message] };
     } finally {
         // Always clear progress toast
         if (progressToast) {

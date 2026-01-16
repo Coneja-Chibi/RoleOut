@@ -7,6 +7,7 @@ import { getContext } from '../../../extensions.js';
 import { characters, this_chid, getRequestHeaders } from '../../../../script.js';
 import { world_names } from '../../../world-info.js';
 import { openai_setting_names } from '../../../openai.js';
+import { power_user } from '../../../power-user.js';
 
 /**
  * Get all characters
@@ -154,8 +155,40 @@ export function getLorebookList() {
 }
 
 /**
+ * Get personas
+ * @returns {Array<{id: number, name: string, avatar: string, description: string, title: string, isDefault: boolean}>}
+ */
+export function getPersonaList() {
+    try {
+        if (!power_user || !power_user.personas) {
+            console.warn('[RoleOut] Personas not available');
+            return [];
+        }
+
+        // power_user.personas is an object where keys are avatar filenames and values are persona names
+        const personaAvatars = Object.keys(power_user.personas);
+
+        return personaAvatars.map((avatar, index) => {
+            const personaDesc = power_user.persona_descriptions?.[avatar] || {};
+
+            return {
+                id: index,
+                name: power_user.personas[avatar] || '[Unnamed Persona]',
+                avatar: avatar,
+                description: personaDesc.description || '',
+                title: personaDesc.title || '',
+                isDefault: avatar === power_user.default_persona
+            };
+        });
+    } catch (error) {
+        console.error('[RoleOut] Error getting persona list:', error);
+        return [];
+    }
+}
+
+/**
  * Get counts for all content types (async to fetch chat count)
- * @returns {Promise<{characters: number, chats: number, presets: number, lorebooks: number}>}
+ * @returns {Promise<{characters: number, chats: number, presets: number, lorebooks: number, personas: number}>}
  */
 export async function getCounts() {
     // Fetch actual chat count from API
@@ -173,6 +206,9 @@ export async function getCounts() {
         presets: (openai_setting_names && typeof openai_setting_names === 'object')
             ? Object.keys(openai_setting_names).length
             : 0,
-        lorebooks: (world_names && Array.isArray(world_names)) ? world_names.length : 0
+        lorebooks: (world_names && Array.isArray(world_names)) ? world_names.length : 0,
+        personas: (power_user?.personas && typeof power_user.personas === 'object')
+            ? Object.keys(power_user.personas).length
+            : 0
     };
 }

@@ -74,6 +74,22 @@
                         </div>
                     </div>
 
+                    <!-- Personas Export Panel -->
+                    <div class="rolecall-status-panel rolecall-clickable" id="rolecall-panel-personas">
+                        <div class="rolecall-status-icon">
+                            <img src="scripts/extensions/third-party/RoleOut/icons/user-circle.svg" alt="Personas" width="24" height="24">
+                        </div>
+                        <div class="rolecall-status-content">
+                            <div class="rolecall-status-title">Personas</div>
+                            <div class="rolecall-status-value">Ready to export</div>
+                            <div class="rolecall-status-detail">Click to configure</div>
+                        </div>
+                        <div class="rolecall-status-indicator"></div>
+                        <div class="rolecall-click-hint">
+                            <i class="fa-solid fa-mouse-pointer"></i>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
@@ -212,6 +228,40 @@
 
                     <!-- Item List -->
                     <div class="rolecall-item-list" id="rolecall-list-lorebooks"></div>
+                </div>
+            </div>
+
+            <!-- Personas Options -->
+            <div class="rolecall-options-card" id="rolecall-options-personas" style="display: none;">
+                <div class="rolecall-options-header">
+                    <div class="rolecall-options-title">
+                        <img src="scripts/extensions/third-party/RoleOut/icons/user-circle.svg" alt="" width="20" height="20">
+                        <span>Persona Export Options</span>
+                    </div>
+                    <button class="rolecall-close-options" data-target="personas">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="rolecall-options-body">
+                    <!-- Search and Multi-Select Controls -->
+                    <div class="rolecall-controls-row">
+                        <div class="rolecall-search-container">
+                            <input type="text" class="rolecall-search-input" id="rolecall-search-personas" placeholder="Search personas...">
+                        </div>
+                        <button class="rolecall-multi-select-btn" data-type="personas" title="Toggle multi-select mode">
+                            <i class="fa-solid fa-check-square"></i>
+                            <span>Select Multiple</span>
+                        </button>
+                    </div>
+
+                    <!-- Export Selected Button (hidden by default) -->
+                    <button class="rolecall-export-selected-btn" id="rolecall-export-selected-personas" data-type="personas" style="display: none;" disabled>
+                        <i class="fa-solid fa-download"></i>
+                        Export Selected
+                    </button>
+
+                    <!-- Item List -->
+                    <div class="rolecall-item-list" id="rolecall-list-personas"></div>
                 </div>
             </div>
 

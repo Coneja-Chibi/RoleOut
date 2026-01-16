@@ -3,7 +3,7 @@
  * Separated concern: View layer
  */
 
-import { getCharacterList, getChatList, getPresetList, getLorebookList, getCounts } from './data-providers.js';
+import { getCharacterList, getChatList, getPresetList, getLorebookList, getPersonaList, getCounts } from './data-providers.js';
 
 /**
  * Update status panel counts
@@ -25,6 +25,9 @@ export async function updateStatusCounts() {
 
         $('#rolecall-panel-lorebooks .rolecall-status-value')
             .text(`${counts.lorebooks} lorebook${counts.lorebooks !== 1 ? 's' : ''} detected`);
+
+        $('#rolecall-panel-personas .rolecall-status-value')
+            .text(`${counts.personas} persona${counts.personas !== 1 ? 's' : ''} detected`);
     } catch (error) {
         console.error('[RoleOut] Error updating counts:', error);
     }
@@ -32,7 +35,7 @@ export async function updateStatusCounts() {
 
 /**
  * Populate item list in options card
- * @param {string} type - Content type (characters, chats, presets, lorebooks)
+ * @param {string} type - Content type (characters, chats, presets, lorebooks, personas)
  */
 export async function populateItemList(type) {
     const listContainer = $(`#rolecall-list-${type}`);
@@ -58,6 +61,9 @@ export async function populateItemList(type) {
                 break;
             case 'lorebooks':
                 items = getLorebookList();
+                break;
+            case 'personas':
+                items = getPersonaList();
                 break;
             default:
                 console.error(`[RoleOut] Unknown type: ${type}`);
@@ -161,6 +167,24 @@ function createListItemElement(type, item) {
         }
 
         itemEl.append(contentWrapper);
+    } else if (type === 'personas' && item.avatar) {
+        // For personas, show avatar and name (similar to characters)
+        const avatarEl = $('<div class="rolecall-item-avatar"></div>');
+        const imgEl = $('<img>');
+        imgEl.attr('src', `/User Avatars/${item.avatar}`);
+        imgEl.attr('alt', item.name);
+        imgEl.on('error', function() {
+            $(this).attr('src', 'scripts/extensions/third-party/RoleOut/icons/user-circle.svg');
+        });
+        avatarEl.append(imgEl);
+        itemEl.append(avatarEl);
+
+        const nameEl = $('<div class="rolecall-item-name"></div>');
+        nameEl.text(item.name);
+        if (item.isDefault) {
+            nameEl.append(' <span style="color: var(--rolecall-accent); font-size: 0.8em;">★ DEFAULT</span>');
+        }
+        itemEl.append(nameEl);
     } else {
         const nameEl = $('<div class="rolecall-item-name"></div>');
         nameEl.text(item.name);
@@ -236,6 +260,10 @@ function createItemOptionsPanel(type, item) {
         case 'lorebooks':
             // No options needed - lorebooks always export with all their entries
             optionsGroup.append($('<div class="rolecall-no-options">Lorebooks export with all entries</div>'));
+            break;
+        case 'personas':
+            // No options needed - personas export with avatar, name, description, and title
+            optionsGroup.append($('<div class="rolecall-no-options">Personas export with avatar and all metadata</div>'));
             break;
     }
 

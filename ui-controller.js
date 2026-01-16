@@ -214,9 +214,6 @@ function createItemOptionsPanel(type, item) {
 
     switch (type) {
         case 'characters':
-            // Include current configuration (preset, settings, attached lorebooks)
-            optionsGroup.append(createOptionCheckbox(`char_config_${item.id}`, 'Include Current Configuration', false));
-
             // Only show checkboxes for features that actually exist
             if (item.hasAvatar) {
                 optionsGroup.append(createOptionCheckbox(`char_avatar_${item.id}`, 'Include Avatar', true));
@@ -233,7 +230,7 @@ function createItemOptionsPanel(type, item) {
             optionsGroup.append(createOptionCheckbox(`chat_character_${item.id}`, 'Include Character', true));
             break;
         case 'presets':
-            // No options needed - presets always export with all their data
+            optionsGroup.append(createOptionCheckbox(`preset_config_${item.id}`, 'Include Current Configuration (enabled/disabled prompts)', false));
             optionsGroup.append($('<div class="rolecall-no-options">Presets export with all prompts and settings</div>'));
             break;
         case 'lorebooks':

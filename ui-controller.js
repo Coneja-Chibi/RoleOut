@@ -222,7 +222,8 @@ function createItemOptionsPanel(type, item) {
                 optionsGroup.append(createOptionCheckbox(`char_greetings_${item.id}`, 'Alternate Greetings', true));
             }
             if (item.hasLorebook) {
-                optionsGroup.append(createOptionCheckbox(`char_lorebook_${item.id}`, 'Attached Lorebook', true));
+                const lorebookLabel = `Attached Lorebook: ${item.lorebookName}`;
+                optionsGroup.append(createOptionCheckbox(`char_lorebook_${item.id}`, lorebookLabel, true));
             }
             // If no options available, show a message
             if (!item.hasAvatar && !item.hasAltGreetings && !item.hasLorebook) {

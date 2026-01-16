@@ -30,6 +30,7 @@ export function getCharacterList() {
                 (Array.isArray(characterBook.entries) && characterBook.entries.length > 0) ||
                 characterBook.name
             );
+            const lorebookName = hasLorebook ? (characterBook.name || 'Unnamed Lorebook') : null;
 
             return {
                 id: index,
@@ -37,7 +38,8 @@ export function getCharacterList() {
                 avatar: char.avatar,
                 hasAvatar: !!char.avatar,
                 hasAltGreetings,
-                hasLorebook
+                hasLorebook,
+                lorebookName
             };
         });
     } catch (error) {

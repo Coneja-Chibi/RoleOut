@@ -4,8 +4,10 @@
  */
 
 import { getRequestHeaders } from '../../../../script.js';
+import { getCharacterList } from './data-providers.js';
 
 const MODULE_NAME = 'RoleOut-Export';
+const MAX_CONCURRENT_EXPORTS = 5; // Don't hammer the server
 
 /**
  * Load JSZip library dynamically
@@ -35,8 +37,45 @@ function downloadBlob(blob, filename) {
 }
 
 /**
+ * Get safe filename from character avatar path
+ * Handles edge cases like uppercase extensions, multiple dots, etc.
+ * @param {string} avatarPath - Original avatar path (e.g., "character.png")
+ * @param {string} newExtension - New extension without dot (e.g., "json")
+ * @returns {string} Safe filename
+ */
+function getSafeFilename(avatarPath, newExtension) {
+    if (!avatarPath) {
+        return `character_${Date.now()}.${newExtension}`;
+    }
+
+    // Extract just the filename, handle paths
+    const filename = avatarPath.split('/').pop().split('\\').pop();
+
+    // Remove extension (case-insensitive)
+    const nameWithoutExt = filename.replace(/\.[^.]+$/, '');
+
+    // Sanitize the name
+    const safeName = nameWithoutExt.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    return `${safeName}.${newExtension}`;
+}
+
+/**
+ * Prepare export request body for a character
+ * @param {Object} character - Character object with avatar property
+ * @param {string} format - Export format ('json' or 'png')
+ * @returns {Object} Request body
+ */
+function prepareExportRequest(character, format) {
+    return {
+        format: format,
+        avatar_url: character.avatar
+    };
+}
+
+/**
  * Export a single character from SillyTavern
- * @param {number} characterId - The character index (this_chid)
+ * @param {number} characterId - The character index
  * @param {string} format - Export format ('json' or 'png')
  * @returns {Promise<{success: boolean, error?: string}>}
  */
@@ -44,16 +83,15 @@ export async function exportSingleCharacter(characterId, format = 'json') {
     try {
         console.log(`[${MODULE_NAME}] Exporting character ${characterId} as ${format}`);
 
-        // Get character data from ST's global characters array
-        if (!window.characters || !window.characters[characterId]) {
-            throw new Error(`Character ${characterId} not found`);
+        // Use data provider instead of raw window access
+        const characters = getCharacterList();
+        const character = characters.find(c => c.id === characterId);
+
+        if (!character) {
+            throw new Error(`Character with ID ${characterId} not found in character list`);
         }
 
-        const character = window.characters[characterId];
-        const body = {
-            format: format,
-            avatar_url: character.avatar
-        };
+        const body = prepareExportRequest(character, format);
 
         // Call ST's export endpoint
         const response = await fetch('/api/characters/export', {
@@ -63,12 +101,13 @@ export async function exportSingleCharacter(characterId, format = 'json') {
         });
 
         if (!response.ok) {
-            throw new Error(`Export failed with status ${response.status}`);
+            const statusText = response.statusText || 'Unknown error';
+            throw new Error(`Export failed: HTTP ${response.status} - ${statusText}`);
         }
 
         // Download the file
         const blob = await response.blob();
-        const filename = character.avatar.replace('.png', `.${format}`);
+        const filename = getSafeFilename(character.avatar, format);
         downloadBlob(blob, filename);
 
         console.log(`[${MODULE_NAME}] Successfully exported ${filename}`);
@@ -76,98 +115,182 @@ export async function exportSingleCharacter(characterId, format = 'json') {
         return { success: true };
 
     } catch (error) {
-        console.error(`[${MODULE_NAME}] Export failed:`, error);
+        console.error(`[${MODULE_NAME}] Export failed for character ${characterId}:`, error);
         toastr.error(`Failed to export: ${error.message}`, 'RoleOut');
         return { success: false, error: error.message };
     }
 }
 
 /**
+ * Export a single character (helper for batch export)
+ * @param {Object} character - Character object
+ * @param {string} format - Export format
+ * @returns {Promise<{success: boolean, filename?: string, blob?: Blob, error?: string}>}
+ */
+async function exportSingleCharacterToBlob(character, format) {
+    try {
+        const body = prepareExportRequest(character, format);
+
+        const response = await fetch('/api/characters/export', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        const filename = getSafeFilename(character.avatar, format);
+
+        return { success: true, filename, blob };
+    } catch (error) {
+        console.error(`[${MODULE_NAME}] Failed to export ${character.name}:`, error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Batch export characters with concurrency limit
+ * @param {Array<Object>} characters - Array of character objects
+ * @param {string} format - Export format
+ * @returns {Promise<Array<{success: boolean, character: Object, filename?: string, blob?: Blob, error?: string}>>}
+ */
+async function batchExportCharacters(characters, format) {
+    const results = [];
+    const queue = [...characters];
+    const inProgress = new Set();
+
+    while (queue.length > 0 || inProgress.size > 0) {
+        // Fill up to max concurrent exports
+        while (inProgress.size < MAX_CONCURRENT_EXPORTS && queue.length > 0) {
+            const character = queue.shift();
+            const promise = exportSingleCharacterToBlob(character, format)
+                .then(result => {
+                    inProgress.delete(promise);
+                    return { ...result, character };
+                });
+            inProgress.add(promise);
+        }
+
+        // Wait for at least one to complete
+        if (inProgress.size > 0) {
+            const result = await Promise.race(inProgress);
+            results.push(result);
+        }
+    }
+
+    return results;
+}
+
+/**
+ * Get current timestamp in safe filename format
+ * Format: YYYY-MM-DD_HH-MM-SS
+ * @returns {string}
+ */
+function getTimestampForFilename() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+
+    return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
+}
+
+/**
  * Export multiple characters as a ZIP file
  * @param {number[]} characterIds - Array of character indices
  * @param {string} format - Export format ('json' or 'png')
- * @returns {Promise<{success: boolean, exported: number, failed: number}>}
+ * @returns {Promise<{success: boolean, exported: number, failed: number, errors?: Array}>}
  */
 export async function exportCharactersAsZip(characterIds, format = 'json') {
+    let progressToast = null;
+
     try {
         console.log(`[${MODULE_NAME}] Bulk export: ${characterIds.length} characters as ${format}`);
+
+        // Use data provider to get characters
+        const allCharacters = getCharacterList();
+        const charactersToExport = characterIds
+            .map(id => allCharacters.find(c => c.id === id))
+            .filter(Boolean); // Remove any undefined entries
+
+        if (charactersToExport.length === 0) {
+            throw new Error('No valid characters found to export');
+        }
+
+        // Show progress toast
+        progressToast = toastr.info(
+            `Preparing ${charactersToExport.length} character${charactersToExport.length > 1 ? 's' : ''}...`,
+            'RoleOut',
+            { timeOut: 0, extendedTimeOut: 0 }
+        );
 
         // Load JSZip
         const JSZip = await loadJSZip();
         const zip = new JSZip();
 
+        // Batch export with concurrency control
+        const results = await batchExportCharacters(charactersToExport, format);
+
         let exported = 0;
         let failed = 0;
+        const errors = [];
 
-        // Show progress toast
-        toastr.info(`Preparing ${characterIds.length} characters...`, 'RoleOut', { timeOut: 0 });
-
-        // Fetch each character
-        for (const characterId of characterIds) {
-            try {
-                if (!window.characters || !window.characters[characterId]) {
-                    console.warn(`[${MODULE_NAME}] Character ${characterId} not found, skipping`);
-                    failed++;
-                    continue;
-                }
-
-                const character = window.characters[characterId];
-                const body = {
-                    format: format,
-                    avatar_url: character.avatar
-                };
-
-                const response = await fetch('/api/characters/export', {
-                    method: 'POST',
-                    headers: getRequestHeaders(),
-                    body: JSON.stringify(body),
-                });
-
-                if (!response.ok) {
-                    console.warn(`[${MODULE_NAME}] Failed to export ${character.name}`);
-                    failed++;
-                    continue;
-                }
-
-                // Add file to ZIP
-                const blob = await response.blob();
-                const filename = character.avatar.replace('.png', `.${format}`);
-                zip.file(filename, blob);
-
+        // Add successful exports to ZIP
+        for (const result of results) {
+            if (result.success && result.blob && result.filename) {
+                zip.file(result.filename, result.blob);
                 exported++;
-                console.log(`[${MODULE_NAME}] Added ${filename} to ZIP (${exported}/${characterIds.length})`);
-
-            } catch (error) {
-                console.error(`[${MODULE_NAME}] Error exporting character ${characterId}:`, error);
+                console.log(`[${MODULE_NAME}] Added ${result.filename} to ZIP (${exported}/${charactersToExport.length})`);
+            } else {
                 failed++;
+                const errorMsg = `${result.character.name}: ${result.error || 'Unknown error'}`;
+                errors.push(errorMsg);
+                console.warn(`[${MODULE_NAME}] ${errorMsg}`);
             }
         }
 
-        // Clear progress toast
-        toastr.clear();
-
         if (exported === 0) {
-            toastr.error('No characters were exported successfully', 'RoleOut');
-            return { success: false, exported: 0, failed };
+            throw new Error('No characters were exported successfully');
         }
 
         // Generate ZIP file
-        toastr.info('Creating ZIP file...', 'RoleOut');
+        if (progressToast) {
+            toastr.clear(progressToast);
+        }
+        progressToast = toastr.info('Creating ZIP file...', 'RoleOut', { timeOut: 0, extendedTimeOut: 0 });
+
         const zipBlob = await zip.generateAsync({ type: 'blob' });
 
         // Download ZIP
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const timestamp = getTimestampForFilename();
         const zipFilename = `RoleOut_Characters_${timestamp}.zip`;
         downloadBlob(zipBlob, zipFilename);
 
-        console.log(`[${MODULE_NAME}] Successfully created ${zipFilename}`);
-        toastr.success(`Exported ${exported} character${exported > 1 ? 's' : ''} to ${zipFilename}`, 'RoleOut', { timeOut: 5000 });
+        console.log(`[${MODULE_NAME}] Successfully created ${zipFilename} (${exported} files)`);
 
-        return { success: true, exported, failed };
+        // Show success message with details
+        const message = failed > 0
+            ? `Exported ${exported} character${exported > 1 ? 's' : ''} (${failed} failed)`
+            : `Exported ${exported} character${exported > 1 ? 's' : ''}`;
+
+        toastr.success(message, zipFilename, { timeOut: 5000 });
+
+        return { success: true, exported, failed, errors: failed > 0 ? errors : undefined };
 
     } catch (error) {
         console.error(`[${MODULE_NAME}] Bulk export failed:`, error);
         toastr.error(`Bulk export failed: ${error.message}`, 'RoleOut');
-        return { success: false, exported: 0, failed: characterIds.length };
+        return { success: false, exported: 0, failed: characterIds.length, errors: [error.message] };
+    } finally {
+        // Always clear progress toast
+        if (progressToast) {
+            toastr.clear(progressToast);
+        }
     }
 }

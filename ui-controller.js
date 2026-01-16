@@ -262,8 +262,8 @@ function createItemOptionsPanel(type, item) {
             optionsGroup.append($('<div class="rolecall-no-options">Lorebooks export with all entries</div>'));
             break;
         case 'personas':
-            // No options needed - personas export with avatar, name, description, and title
-            optionsGroup.append($('<div class="rolecall-no-options">Personas export with avatar and all metadata</div>'));
+            // No options needed - personas export as PNG with embedded metadata
+            optionsGroup.append($('<div class="rolecall-no-options">Personas export as PNG with embedded metadata (like character cards)</div>'));
             break;
     }
 

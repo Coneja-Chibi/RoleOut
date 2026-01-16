@@ -5,6 +5,7 @@
 
 import { getRequestHeaders } from '../../../../script.js';
 import { getCharacterList, getPersonaList } from './data-providers.js';
+import { embedMetadataInPNG } from './png-metadata.js';
 
 const MODULE_NAME = 'RoleOut-Export';
 const MAX_CONCURRENT_EXPORTS = 5; // Don't hammer the server
@@ -611,7 +612,7 @@ export async function exportChatsAsZip(chatExports) {
 
 /**
  * Export a single persona from SillyTavern
- * Personas are exported as JSON files with avatar and metadata
+ * Personas are exported as PNG files with embedded JSON metadata (like character cards)
  * @param {number} personaId - Persona ID (index in getPersonaList())
  * @returns {Promise<{success: boolean, error?: string}>}
  */
@@ -626,40 +627,36 @@ export async function exportSinglePersona(personaId) {
             throw new Error('Persona not found');
         }
 
-        // Fetch the avatar image as base64
-        let avatarBase64 = null;
-        if (persona.avatar) {
-            try {
-                const avatarResponse = await fetch(`/User Avatars/${persona.avatar}`);
-                if (avatarResponse.ok) {
-                    const blob = await avatarResponse.blob();
-                    avatarBase64 = await new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result.split(',')[1]); // Remove data:image/png;base64, prefix
-                        reader.readAsDataURL(blob);
-                    });
-                }
-            } catch (err) {
-                console.warn(`[${MODULE_NAME}] Failed to fetch persona avatar:`, err);
-            }
+        // Fetch the avatar image
+        if (!persona.avatar) {
+            throw new Error('Persona has no avatar image');
         }
 
-        // Create persona export object
-        const personaExport = {
+        const avatarResponse = await fetch(`/User Avatars/${persona.avatar}`);
+        if (!avatarResponse.ok) {
+            throw new Error(`Failed to fetch persona avatar: ${avatarResponse.statusText}`);
+        }
+
+        const avatarBlob = await avatarResponse.blob();
+        const avatarBuffer = await avatarBlob.arrayBuffer();
+        const pngData = new Uint8Array(avatarBuffer);
+
+        // Create persona metadata object
+        const personaMetadata = {
             name: persona.name,
             description: persona.description || '',
             title: persona.title || '',
-            avatar: persona.avatar,
-            avatarBase64: avatarBase64,
             isDefault: persona.isDefault,
             exportedAt: new Date().toISOString(),
             exportedBy: 'RoleOut'
         };
 
-        // Download as JSON file
-        const jsonString = JSON.stringify(personaExport, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const filename = getSafeFilename(persona.avatar || persona.name, 'json');
+        // Embed metadata into PNG using 'persona' keyword
+        const pngWithMetadata = embedMetadataInPNG(pngData, 'persona', personaMetadata);
+
+        // Download as PNG file
+        const blob = new Blob([pngWithMetadata], { type: 'image/png' });
+        const filename = persona.avatar; // Keep original filename
         downloadBlob(blob, filename);
 
         console.log(`[${MODULE_NAME}] Successfully exported persona: ${filename}`);
@@ -674,7 +671,7 @@ export async function exportSinglePersona(personaId) {
 }
 
 /**
- * Export personas as ZIP file
+ * Export personas as ZIP file containing PNG files with embedded metadata
  * @param {number[]} personaIds - Array of persona IDs
  * @returns {Promise<{success: boolean, exported: number, failed: number, errors?: Array}>}
  */
@@ -712,42 +709,35 @@ export async function exportPersonasAsZip(personaIds) {
                     throw new Error(`Persona ${id} not found`);
                 }
 
-                // Fetch avatar if available
-                let avatarBase64 = null;
-                if (persona.avatar) {
-                    try {
-                        const avatarResponse = await fetch(`/User Avatars/${persona.avatar}`);
-                        if (avatarResponse.ok) {
-                            const blob = await avatarResponse.blob();
-                            avatarBase64 = await new Promise((resolve) => {
-                                const reader = new FileReader();
-                                reader.onloadend = () => resolve(reader.result.split(',')[1]);
-                                reader.readAsDataURL(blob);
-                            });
-
-                            // Add avatar image to ZIP
-                            const avatarBlob = await avatarResponse.blob();
-                            zip.file(persona.avatar, avatarBlob);
-                        }
-                    } catch (err) {
-                        console.warn(`[${MODULE_NAME}] Failed to fetch avatar for ${persona.name}:`, err);
-                    }
+                if (!persona.avatar) {
+                    throw new Error(`Persona ${persona.name} has no avatar`);
                 }
 
-                // Create persona metadata JSON
-                const personaExport = {
+                // Fetch avatar image
+                const avatarResponse = await fetch(`/User Avatars/${persona.avatar}`);
+                if (!avatarResponse.ok) {
+                    throw new Error(`Failed to fetch avatar: ${avatarResponse.statusText}`);
+                }
+
+                const avatarBlob = await avatarResponse.blob();
+                const avatarBuffer = await avatarBlob.arrayBuffer();
+                const pngData = new Uint8Array(avatarBuffer);
+
+                // Create persona metadata
+                const personaMetadata = {
                     name: persona.name,
                     description: persona.description || '',
                     title: persona.title || '',
-                    avatar: persona.avatar,
                     isDefault: persona.isDefault,
                     exportedAt: new Date().toISOString(),
                     exportedBy: 'RoleOut'
                 };
 
-                // Add JSON to ZIP
-                const jsonFilename = getSafeFilename(persona.avatar || persona.name, 'json');
-                zip.file(jsonFilename, JSON.stringify(personaExport, null, 2));
+                // Embed metadata into PNG
+                const pngWithMetadata = embedMetadataInPNG(pngData, 'persona', personaMetadata);
+
+                // Add PNG to ZIP
+                zip.file(persona.avatar, pngWithMetadata);
 
                 exported++;
                 console.log(`[${MODULE_NAME}] Added persona: ${persona.name} (${exported}/${personaIds.length})`);

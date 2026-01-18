@@ -148,10 +148,14 @@ function createTextChunk(keyword, jsonString) {
  */
 export function embedMetadataInPNG(pngData, keyword, jsonData) {
     const jsonString = JSON.stringify(jsonData);
-    const textChunk = createTextChunk(keyword, jsonString);
+
+    // Base64 encode the JSON for RoleCall compatibility
+    const base64Json = btoa(jsonString);
+
+    const textChunk = createTextChunk(keyword, base64Json);
     const result = insertChunkBeforeIEND(pngData, textChunk);
 
-    console.log(`[RoleOut PNG] Embedded ${jsonString.length} bytes as '${keyword}' chunk`);
+    console.log(`[RoleOut PNG] Embedded ${jsonString.length} bytes (${base64Json.length} base64) as '${keyword}' chunk`);
 
     return result;
 }
@@ -202,7 +206,14 @@ export function extractMetadataFromPNG(pngData, keyword) {
         const result = readTextChunk(chunk, keyword);
         if (result) {
             try {
-                return JSON.parse(result.text);
+                // Try base64 decoding first (new format)
+                let jsonText = result.text;
+                try {
+                    jsonText = atob(result.text);
+                } catch (e) {
+                    // Not base64, use as-is (legacy format)
+                }
+                return JSON.parse(jsonText);
             } catch (error) {
                 console.error(`[RoleOut PNG] Failed to parse '${keyword}' metadata:`, error);
                 return null;

@@ -92,6 +92,7 @@ export async function getChatList() {
             return {
                 id: index,
                 name: chat.file_name || chat.name || 'Unnamed Chat',
+                file_name: chat.file_name, // Required for export
                 character: characterName,
                 avatar: avatarPath,
                 lastMessage: chat.mes || '[Empty chat]',

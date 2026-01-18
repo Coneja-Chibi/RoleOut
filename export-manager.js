@@ -7,7 +7,6 @@ import { getRequestHeaders, user_avatar } from '../../../../script.js';
 import { getCharacterList, getPersonaList } from './data-providers.js';
 import { embedMetadataInPNG } from './png-metadata.js';
 import { power_user } from '../../../power-user.js';
-import { openai_setting_names } from '../../../openai.js';
 
 const MODULE_NAME = 'RoleOut-Export';
 const MAX_CONCURRENT_EXPORTS = 5; // Don't hammer the server
@@ -20,7 +19,21 @@ async function loadJSZip() {
     if (window.JSZip) {
         return window.JSZip;
     }
-    return (await import('/lib/jszip.min.js')).default;
+
+    // Load JSZip as a script tag (UMD module sets window.JSZip)
+    await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = '/lib/jszip.min.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('Failed to load JSZip library'));
+        document.head.appendChild(script);
+    });
+
+    if (!window.JSZip) {
+        throw new Error('JSZip library loaded but window.JSZip is not defined');
+    }
+
+    return window.JSZip;
 }
 
 /**
@@ -306,17 +319,30 @@ export async function exportCharactersAsZip(characterIds, format = 'json') {
  */
 export async function exportSingleChat(chat, options = {}) {
     try {
-        console.log(`[${MODULE_NAME}] Exporting chat: ${chat.file_name}`, options);
+        console.log(`[${MODULE_NAME}] Exporting chat:`, chat, 'Options:', options);
 
         const includeCharacter = options.includeCharacter !== false; // Default true
         const exportBundle = options.exportBundle || false; // Bundle includes preset + persona + character
 
+        // Validate chat object
+        if (!chat || !chat.file_name) {
+            throw new Error('Invalid chat object: missing file_name');
+        }
+
         // If exporting as bundle, create comprehensive ZIP
         if (exportBundle && chat.avatar) {
+            // Get selected preset from options (from UI dropdown)
+            const selectedPresetName = options.selectedPreset || null;
+
             const JSZip = await loadJSZip();
             const zip = new JSZip();
 
             // 1. Export chat as JSONL
+            console.log(`[${MODULE_NAME}] Exporting chat JSONL with params:`, {
+                file: chat.file_name,
+                avatar_url: chat.avatar,
+                format: 'jsonl'
+            });
             const chatResponse = await fetch('/api/chats/export', {
                 method: 'POST',
                 headers: getRequestHeaders(),
@@ -358,56 +384,147 @@ export async function exportSingleChat(chat, options = {}) {
             const charFilename = getSafeFilename(chat.avatar, 'png');
             zip.file(`character/${charFilename}`, charBlob);
 
-            // 3. Export current preset as JSON
-            const currentPresetName = power_user?.preset_settings || power_user?.main_api;
-            if (currentPresetName && openai_setting_names?.includes(currentPresetName)) {
+            // 3. Export user-selected preset as JSON (if they chose one)
+            // Using ST's native preset access pattern (same as openai.js onExportPresetClick)
+            if (selectedPresetName && selectedPresetName.length > 0) {
                 try {
-                    const presetResponse = await fetch('/api/presets/get', {
-                        method: 'POST',
-                        headers: getRequestHeaders(),
-                        body: JSON.stringify({ name: currentPresetName }),
-                    });
+                    console.log(`[${MODULE_NAME}] Exporting user-selected preset: ${selectedPresetName}`);
 
-                    if (presetResponse.ok) {
-                        const presetData = await presetResponse.json();
-                        const presetFilename = getSafeFilename(currentPresetName, 'json');
-                        zip.file(`preset/${presetFilename}`, JSON.stringify(presetData, null, 2));
-                        console.log(`[${MODULE_NAME}] Added preset to bundle: ${currentPresetName}`);
+                    // Import ST's native preset settings (same approach as openai.js)
+                    const { openai_settings, openai_setting_names } = await import('../../../openai.js');
+
+                    if (!openai_setting_names[selectedPresetName]) {
+                        throw new Error(`Preset "${selectedPresetName}" not found in openai_setting_names`);
                     }
+
+                    // Get the preset data using ST's native storage structure
+                    const settingIndex = openai_setting_names[selectedPresetName];
+                    const presetData = openai_settings[settingIndex];
+
+                    if (!presetData) {
+                        throw new Error(`Preset data not found at index ${settingIndex}`);
+                    }
+
+                    // Clone the preset to avoid modifying the original
+                    const presetClone = structuredClone(presetData);
+
+                    // Add the preset name to the exported JSON (RoleCall needs this for import)
+                    presetClone.name = selectedPresetName;
+
+                    // ST's export format: JSON with 4-space indent (matches onExportPresetClick behavior)
+                    // Use the preset name directly, sanitize it but don't strip "extensions" like ".8" in "v2.8"
+                    const safePresetName = selectedPresetName.replace(/[^a-zA-Z0-9_.\- ]/g, '_').replace(/\s+/g, '_');
+                    const presetFilename = `${safePresetName}.json`;
+                    zip.file(`preset/${presetFilename}`, JSON.stringify(presetClone, null, 4));
+                    console.log(`[${MODULE_NAME}] ✓ Successfully added preset to bundle: ${selectedPresetName}`);
                 } catch (presetError) {
-                    console.warn(`[${MODULE_NAME}] Could not export preset:`, presetError);
+                    console.error(`[${MODULE_NAME}] Failed to export preset "${selectedPresetName}":`, presetError);
+                    toastr.warning(`Failed to export preset: ${presetError.message}`, MODULE_NAME);
                     // Continue without preset - not critical
                 }
+            } else {
+                console.log(`[${MODULE_NAME}] User chose to skip preset export`);
             }
 
             // 4. Export current persona as PNG with embedded metadata
             if (user_avatar) {
                 try {
+                    console.log(`[${MODULE_NAME}] Exporting persona: ${user_avatar}`);
+                    console.log(`[${MODULE_NAME}] power_user.personas:`, power_user?.personas);
+                    console.log(`[${MODULE_NAME}] power_user.persona_descriptions:`, power_user?.persona_descriptions);
+
                     const avatarResponse = await fetch(`/User Avatars/${user_avatar}`);
                     if (avatarResponse.ok) {
                         const avatarBlob = await avatarResponse.blob();
                         const avatarBuffer = await avatarBlob.arrayBuffer();
                         const pngData = new Uint8Array(avatarBuffer);
 
-                        // Get persona metadata from power_user
+                        // Get persona metadata from power_user (correct ST structure)
+                        console.log(`[${MODULE_NAME}] user_avatar:`, user_avatar);
+                        console.log(`[${MODULE_NAME}] power_user.personas keys:`, Object.keys(power_user?.personas || {}));
+                        console.log(`[${MODULE_NAME}] Looking up personas["${user_avatar}"]:`, power_user?.personas?.[user_avatar]);
+
+                        const personaName = power_user?.personas?.[user_avatar] || user_avatar.replace('.png', '');
+                        const personaDescObj = power_user?.persona_descriptions?.[user_avatar] || {};
+                        const personaTitle = personaDescObj?.title || '';
+                        const personaDescription = typeof personaDescObj === 'string' ? personaDescObj : (personaDescObj?.description || power_user?.persona_description || '');
+
+                        console.log(`[${MODULE_NAME}] Extracted persona data:`, {
+                            name: personaName,
+                            title: personaTitle,
+                            descriptionLength: personaDescription.length
+                        });
+
+                        // Build metadata in RoleCall-compatible format
                         const personaMetadata = {
-                            name: power_user?.persona_description || 'User',
-                            description: power_user?.persona_description || '',
+                            name: personaName,
+                            title: personaTitle,  // Maps to RC's description field
+                            content: personaDescription,  // Maps to RC's content field (full persona sheet)
                             avatar: user_avatar,
                             exportedAt: new Date().toISOString(),
-                            exportedBy: 'RoleOut'
+                            exportedBy: 'RoleOut',
+                            source: 'SillyTavern'
                         };
 
-                        // Embed metadata into PNG
-                        const pngWithMetadata = embedMetadataInPNG(pngData, 'persona', personaMetadata);
-                        const personaFilename = getSafeFilename(user_avatar, 'png');
+                        // Embed metadata into PNG using 'chara' keyword (V2 spec)
+                        // RoleCall will parse this as a character card and extract persona data
+                        const pngWithMetadata = embedMetadataInPNG(pngData, 'chara', personaMetadata);
+
+                        // Create filename from persona name and title (e.g., "Boo, TheBazaarHeir.png")
+                        const filenameParts = [personaName];
+                        if (personaTitle && personaTitle.length > 0) {
+                            filenameParts.push(personaTitle);
+                        }
+                        const personaFilename = filenameParts.join(', ').replace(/[^a-zA-Z0-9_,\- ]/g, '_') + '.png';
+
                         zip.file(`persona/${personaFilename}`, pngWithMetadata);
-                        console.log(`[${MODULE_NAME}] Added persona to bundle: ${user_avatar}`);
+                        console.log(`[${MODULE_NAME}] ✓ Successfully added persona to bundle: ${personaName}`);
+                    } else {
+                        console.warn(`[${MODULE_NAME}] Persona avatar fetch failed: HTTP ${avatarResponse.status}`);
                     }
                 } catch (personaError) {
-                    console.warn(`[${MODULE_NAME}] Could not export persona:`, personaError);
+                    console.error(`[${MODULE_NAME}] Failed to export persona:`, personaError);
+                    console.error(`[${MODULE_NAME}] Error details:`, {
+                        message: personaError.message,
+                        stack: personaError.stack
+                    });
                     // Continue without persona - not critical
                 }
+            }
+
+            // 5. Export selected lorebooks (if any)
+            const selectedLorebookNames = options.selectedLorebooks || [];
+            if (selectedLorebookNames.length > 0) {
+                console.log(`[${MODULE_NAME}] Exporting ${selectedLorebookNames.length} lorebooks:`, selectedLorebookNames);
+
+                const { loadWorldInfo } = await import('../../../world-info.js');
+
+                for (const lorebookName of selectedLorebookNames) {
+                    try {
+                        console.log(`[${MODULE_NAME}] Loading lorebook: ${lorebookName}`);
+
+                        // Load lorebook data from SillyTavern
+                        const lorebookData = await loadWorldInfo(lorebookName);
+
+                        if (!lorebookData) {
+                            console.warn(`[${MODULE_NAME}] Lorebook not found: ${lorebookName}`);
+                            continue;
+                        }
+
+                        // Export as JSON (full SillyTavern world info format)
+                        const lorebookJson = JSON.stringify(lorebookData, null, 2);
+                        const safeLorebookName = lorebookName.replace(/[^a-zA-Z0-9_.\- ]/g, '_').replace(/\s+/g, '_');
+                        const lorebookFilename = `${safeLorebookName}.json`;
+
+                        zip.file(`lorebooks/${lorebookFilename}`, lorebookJson);
+                        console.log(`[${MODULE_NAME}] ✓ Successfully added lorebook to bundle: ${lorebookName}`);
+                    } catch (lorebookError) {
+                        console.error(`[${MODULE_NAME}] Failed to export lorebook "${lorebookName}":`, lorebookError);
+                        // Continue with other lorebooks - not critical
+                    }
+                }
+            } else {
+                console.log(`[${MODULE_NAME}] No lorebooks selected for export`);
             }
 
             // Generate and download bundle ZIP

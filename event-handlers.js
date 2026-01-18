@@ -93,6 +93,21 @@ function bindOptionsCardHandlers() {
         updateExportSelectedButton(type);
     });
 
+    // Bundle checkbox handler - show/hide preset dropdown
+    $(document).on('change', 'input[id^="chat_bundle_"]', function() {
+        const itemId = $(this).attr('id').replace('chat_bundle_', '');
+        const presetSelector = $(`#preset_selector_${itemId}`);
+        const lorebookSelector = $(`#lorebook_selector_${itemId}`);
+
+        if ($(this).prop('checked')) {
+            presetSelector.slideDown(200);
+            lorebookSelector.slideDown(200);
+        } else {
+            presetSelector.slideUp(200);
+            lorebookSelector.slideUp(200);
+        }
+    });
+
     // Export single item button
     $(document).on('click', '.rolecall-export-single', function() {
         const type = $(this).attr('data-type');
@@ -142,10 +157,14 @@ function bindGlobalEvents() {
 
     // Update counts when characters are initially loaded
     import('../../../extensions.js').then(({ eventSource, event_types }) => {
-        eventSource.on(event_types.CHARACTER_PAGE_LOADED, () => {
-            console.log('[RoleOut] Characters loaded, updating counts');
-            updateStatusCounts();
-        });
+        if (eventSource && event_types) {
+            eventSource.on(event_types.CHARACTER_PAGE_LOADED, () => {
+                console.log('[RoleOut] Characters loaded, updating counts');
+                updateStatusCounts();
+            });
+        }
+    }).catch(err => {
+        console.warn('[RoleOut] Could not bind to CHARACTER_PAGE_LOADED event:', err);
     });
 }
 
@@ -165,6 +184,21 @@ function getItemExportOptions(itemWrapper, type) {
         const checked = $(this).prop('checked');
         options[id] = checked;
     });
+
+    // For chats, also capture the selected preset and lorebooks
+    if (type === 'chats') {
+        const presetSelect = optionsPanel.find('select[id^="chat_preset_"]');
+        if (presetSelect.length) {
+            options.selectedPreset = presetSelect.val();
+        }
+
+        // Capture selected lorebooks (up to 10)
+        const selectedLorebooks = [];
+        optionsPanel.find('input[name^="chat_lorebook_"]:checked').each(function() {
+            selectedLorebooks.push($(this).val());
+        });
+        options.selectedLorebooks = selectedLorebooks;
+    }
 
     return options;
 }
@@ -196,7 +230,9 @@ async function exportSingleItem(type, id, options = {}) {
         // Map checkbox options to export options
         const exportOptions = {
             includeCharacter: options[`chat_character_${id}`] !== false,
-            exportBundle: options[`chat_bundle_${id}`] || false
+            exportBundle: options[`chat_bundle_${id}`] || false,
+            selectedPreset: options.selectedPreset || null,
+            selectedLorebooks: options.selectedLorebooks || []
         };
 
         await exportSingleChat(chat, exportOptions);

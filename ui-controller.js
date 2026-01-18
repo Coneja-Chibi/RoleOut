@@ -256,6 +256,15 @@ function createItemOptionsPanel(type, item) {
         case 'chats':
             optionsGroup.append(createOptionCheckbox(`chat_character_${item.id}`, 'Include Character', true));
             optionsGroup.append(createOptionCheckbox(`chat_bundle_${item.id}`, 'Export as Bundle (includes preset, persona, character, and all settings)', false));
+
+            // Preset selector (shown only when bundle is checked)
+            const presetSelector = createPresetDropdown(item.id);
+            optionsGroup.append(presetSelector);
+
+            // Lorebook multi-select (shown only when bundle is checked)
+            const lorebookSelector = createLorebookMultiSelect(item.id);
+            optionsGroup.append(lorebookSelector);
+
             optionsGroup.append($('<div class="rolecall-no-options" style="margin-top: 8px; font-size: 0.85em; opacity: 0.8;">Bundle exports everything needed to recreate this chat in RoleCall</div>'));
             break;
         case 'presets':
@@ -299,6 +308,129 @@ function createOptionCheckbox(id, label, checked) {
     checkboxWrapper.append(checkbox);
     checkboxWrapper.append($('<span></span>').text(label));
     return checkboxWrapper;
+}
+
+/**
+ * Create preset dropdown for bundle export
+ * @param {number} itemId - Chat item ID
+ * @returns {jQuery} Preset dropdown element
+ */
+function createPresetDropdown(itemId) {
+    const presets = getPresetList();
+
+    const dropdownWrapper = $('<div class="rolecall-preset-selector"></div>');
+    dropdownWrapper.attr('id', `preset_selector_${itemId}`);
+    dropdownWrapper.css({
+        'margin-left': '24px',
+        'margin-top': '8px',
+        'display': 'none' // Hidden by default, shown when bundle checkbox is checked
+    });
+
+    const label = $('<label style="display: block; margin-bottom: 4px; font-size: 0.9em;">Select Preset:</label>');
+    const select = $('<select class="text_pole"></select>');
+    select.attr('id', `chat_preset_${itemId}`);
+    select.css({
+        'width': '100%',
+        'padding': '6px'
+    });
+
+    // Add "None" option
+    select.append($('<option value="">None (skip preset export)</option>'));
+
+    // Add preset options
+    presets.forEach(preset => {
+        select.append($(`<option value="${preset.name}">${preset.name}</option>`));
+    });
+
+    dropdownWrapper.append(label);
+    dropdownWrapper.append(select);
+
+    return dropdownWrapper;
+}
+
+/**
+ * Create lorebook multi-select (up to 10)
+ * @param {number} itemId - Chat item ID
+ * @returns {jQuery} Lorebook multi-select element
+ */
+function createLorebookMultiSelect(itemId) {
+    const lorebooks = getLorebookList();
+    const maxSelection = 10;
+
+    const multiSelectWrapper = $('<div class="rolecall-lorebook-selector"></div>');
+    multiSelectWrapper.attr('id', `lorebook_selector_${itemId}`);
+    multiSelectWrapper.css({
+        'margin-left': '24px',
+        'margin-top': '8px',
+        'display': 'none' // Hidden by default, shown when bundle checkbox is checked
+    });
+
+    const label = $('<label style="display: block; margin-bottom: 4px; font-size: 0.9em;">Select Lorebooks (up to 10):</label>');
+    multiSelectWrapper.append(label);
+
+    if (lorebooks.length === 0) {
+        const emptyMsg = $('<div style="font-size: 0.85em; opacity: 0.7; padding: 4px;">No lorebooks available</div>');
+        multiSelectWrapper.append(emptyMsg);
+        return multiSelectWrapper;
+    }
+
+    // Create checkbox list
+    const checkboxList = $('<div class="rolecall-lorebook-checkboxes"></div>');
+    checkboxList.css({
+        'max-height': '200px',
+        'overflow-y': 'auto',
+        'border': '1px solid var(--SmartThemeBorderColor)',
+        'border-radius': '4px',
+        'padding': '8px',
+        'background': 'var(--SmartThemeBlurTintColor)'
+    });
+
+    lorebooks.forEach(lorebook => {
+        const checkboxWrapper = $('<div class="rolecall-lorebook-item"></div>');
+        checkboxWrapper.css({
+            'padding': '4px 0',
+            'display': 'flex',
+            'align-items': 'center'
+        });
+
+        const checkbox = $('<input type="checkbox">');
+        checkbox.attr('name', `chat_lorebook_${itemId}`);
+        checkbox.attr('value', lorebook.name);
+        checkbox.attr('data-id', lorebook.id);
+        checkbox.css({
+            'margin-right': '8px',
+            'cursor': 'pointer'
+        });
+
+        // Limit selection to 10
+        checkbox.on('change', function() {
+            const checkedCount = multiSelectWrapper.find('input[type="checkbox"]:checked').length;
+            if (checkedCount > maxSelection) {
+                $(this).prop('checked', false);
+                toastr.warning(`You can only select up to ${maxSelection} lorebooks`, 'Selection Limit');
+            }
+        });
+
+        const checkboxLabel = $('<label></label>');
+        checkboxLabel.text(lorebook.name);
+        checkboxLabel.css({
+            'cursor': 'pointer',
+            'user-select': 'none',
+            'flex': '1'
+        });
+        checkboxLabel.on('click', function(e) {
+            e.preventDefault();
+            checkbox.click();
+        });
+
+        checkboxWrapper.append(checkbox);
+        checkboxWrapper.append(checkboxLabel);
+        checkboxList.append(checkboxWrapper);
+    });
+
+    multiSelectWrapper.append(checkboxList);
+
+    return multiSelectWrapper;
 }
 
 /**

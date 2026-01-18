@@ -184,4 +184,4 @@ MIT
 
 - [RoleCall Web App](https://rolecallstudios.com)
 - [Report Issues](https://github.com/Coneja-Chibi/RoleOut/issues)
-- [SillyTavern Extensions Guide](https://docs.sillytavern.app/extensions/extensions-management/)
+- [SillyTavern Extensions](https://docs.sillytavern.app/extensions/)

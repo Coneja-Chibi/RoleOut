@@ -2,7 +2,7 @@
 
 **Export your SillyTavern content to RoleCall**
 
-A SillyTavern extension that lets you export characters, chats, presets, personas, and lorebooks in a format compatible with the [RoleCall](https://rolecall.app) web app.
+A SillyTavern extension that lets you export characters, chats, presets, personas, and lorebooks in a format compatible with the [RoleCall](https://rolecallstudios.com) web app.
 
 ---
 
@@ -182,6 +182,6 @@ MIT
 
 ## Links
 
-- [RoleCall Web App](https://rolecall.app)
+- [RoleCall Web App](https://rolecallstudios.com)
 - [Report Issues](https://github.com/Coneja-Chibi/RoleOut/issues)
 - [SillyTavern Extensions Guide](https://docs.sillytavern.app/extensions/extensions-management/)

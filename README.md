@@ -18,12 +18,17 @@ RoleOut adds an export panel to SillyTavern's extensions menu, allowing you to:
 
 ### Features
 
-✅ **Smart Bundle Export** - Chat exports can include all related content (character, preset, persona, lorebooks)
-✅ **Batch Export** - Select multiple items and export as a single ZIP file
-✅ **RoleCall Compatible** - All exports designed for direct import to RoleCall
-✅ **Fast Concurrent Exports** - Exports up to 5 items simultaneously
-✅ **Lorebook Multi-Select** - Choose up to 10 lorebooks to bundle with chat exports
-✅ **PNG Metadata Embedding** - Characters and personas use tEXt chunks for metadata
+- ✅ **Smart Bundle Export** - Chat exports can include all related content (character, preset, persona, lorebooks)
+
+- ✅ **Batch Export** - Select multiple items and export as a single ZIP file
+
+- ✅ **RoleCall Compatible** - All exports designed for direct import to RoleCall
+
+- ✅ **Fast Concurrent Exports** - Exports up to 5 items simultaneously
+
+- ✅ **Lorebook Multi-Select** - Choose up to 10 lorebooks to bundle with chat exports
+
+- ✅ **PNG Metadata Embedding** - Characters and personas use tEXt chunks for metadata
 
 ---
 

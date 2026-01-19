@@ -61,9 +61,9 @@ function bindOptionsCardHandlers() {
         toggleMultiSelectMode(type);
     });
 
-    // List item click handlers (expand/collapse)
+    // List item click handlers (expand/collapse or checkbox toggle)
     $(document).on('click', '.rolecall-list-item', function(e) {
-        // Don't expand if clicking checkbox
+        // Don't expand if clicking checkbox directly
         if ($(e.target).hasClass('rolecall-select-checkbox') || $(e.target).closest('.rolecall-item-checkbox').length) {
             return;
         }
@@ -71,8 +71,16 @@ function bindOptionsCardHandlers() {
         const itemWrapper = $(this).closest('.rolecall-item-wrapper');
         const listContainer = itemWrapper.closest('.rolecall-item-list');
 
-        // In multi-select mode, clicking the item shouldn't expand
+        // In multi-select mode, clicking the item toggles the checkbox
         if (listContainer.hasClass('multi-select-mode')) {
+            const checkbox = itemWrapper.find('.rolecall-select-checkbox');
+            const isChecked = checkbox.prop('checked');
+
+            // Toggle checkbox state
+            checkbox.prop('checked', !isChecked);
+
+            // Trigger change event to update visual state and export button
+            checkbox.trigger('change');
             return;
         }
 

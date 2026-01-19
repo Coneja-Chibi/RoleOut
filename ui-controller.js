@@ -525,7 +525,7 @@ export async function toggleOptionsCard(type) {
  */
 export function toggleMultiSelectMode(type) {
     const listContainer = $(`#rolecall-list-${type}`);
-    const toggleBtn = $(`#rolecall-multi-select-${type}`);
+    const toggleBtn = $(`.rolecall-multi-select-btn[data-type="${type}"]`);
     const exportSelectedBtn = $(`#rolecall-export-selected-${type}`);
     const isMultiSelect = listContainer.hasClass('multi-select-mode');
 
@@ -534,6 +534,9 @@ export function toggleMultiSelectMode(type) {
         listContainer.removeClass('multi-select-mode');
         toggleBtn.removeClass('active');
         exportSelectedBtn.hide();
+
+        // Update button icon to unchecked
+        toggleBtn.find('i').removeClass('fa-check-square').addClass('fa-square');
 
         // Hide all checkboxes
         listContainer.find('.rolecall-item-checkbox').hide();
@@ -546,6 +549,9 @@ export function toggleMultiSelectMode(type) {
         listContainer.addClass('multi-select-mode');
         toggleBtn.addClass('active');
         exportSelectedBtn.show();
+
+        // Update button icon to checked
+        toggleBtn.find('i').removeClass('fa-square').addClass('fa-check-square');
 
         // Show all checkboxes
         listContainer.find('.rolecall-item-checkbox').show();

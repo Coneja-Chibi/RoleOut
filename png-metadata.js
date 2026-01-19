@@ -150,7 +150,9 @@ export function embedMetadataInPNG(pngData, keyword, jsonData) {
     const jsonString = JSON.stringify(jsonData);
 
     // Base64 encode the JSON for RoleCall compatibility
-    const base64Json = btoa(jsonString);
+    // Use proper UTF-8 encoding before base64 to handle Unicode characters
+    const utf8Bytes = new TextEncoder().encode(jsonString);
+    const base64Json = btoa(String.fromCharCode(...utf8Bytes));
 
     const textChunk = createTextChunk(keyword, base64Json);
     const result = insertChunkBeforeIEND(pngData, textChunk);
@@ -209,7 +211,10 @@ export function extractMetadataFromPNG(pngData, keyword) {
                 // Try base64 decoding first (new format)
                 let jsonText = result.text;
                 try {
-                    jsonText = atob(result.text);
+                    // Decode base64 and handle UTF-8 properly
+                    const base64Decoded = atob(result.text);
+                    const bytes = Uint8Array.from(base64Decoded, c => c.charCodeAt(0));
+                    jsonText = new TextDecoder().decode(bytes);
                 } catch (e) {
                     // Not base64, use as-is (legacy format)
                 }

@@ -761,61 +761,15 @@
     display: flex;
     align-items: center;
     flex-shrink: 0;
-    position: relative;
 }
 
-/* Hide default checkbox in item list */
+/* Simple visible checkbox */
 .rolecall-select-checkbox {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-}
-
-/* Custom checkbox for item selection */
-.rolecall-item-checkbox::before {
-    content: '';
     width: 20px;
     height: 20px;
-    border: 2px solid color-mix(in srgb, var(--rolecall-accent) 40%, var(--SmartThemeBorderColor));
-    background: color-mix(in srgb, var(--rolecall-accent) 8%, var(--SmartThemeBlurTintColor));
-    border-radius: 0;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
-}
-
-.rolecall-item-checkbox:hover::before {
-    border-color: color-mix(in srgb, var(--rolecall-accent) 60%, transparent);
-    background: color-mix(in srgb, var(--rolecall-accent) 12%, var(--SmartThemeBlurTintColor));
-}
-
-/* Checkmark for item selection */
-.rolecall-item-checkbox::after {
-    content: '';
-    position: absolute;
-    left: 6px;
-    top: 50%;
-    transform: translateY(-50%) scale(0);
-    width: 8px;
-    height: 12px;
-    border: solid var(--rolecall-accent);
-    border-width: 0 2px 2px 0;
-    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    opacity: 0;
-    pointer-events: none;
-}
-
-.rolecall-select-checkbox:checked ~ .rolecall-item-checkbox::before,
-.rolecall-item-wrapper.selected .rolecall-item-checkbox::before {
-    background: linear-gradient(135deg, var(--rolecall-accent) 0%, color-mix(in srgb, var(--rolecall-accent) 80%, black) 100%);
-    border-color: var(--rolecall-accent);
-    box-shadow: 0 2px 6px color-mix(in srgb, var(--rolecall-accent) 40%, transparent);
-}
-
-.rolecall-select-checkbox:checked ~ .rolecall-item-checkbox::after,
-.rolecall-item-wrapper.selected .rolecall-item-checkbox::after {
-    opacity: 1;
-    transform: translateY(-65%) rotate(45deg) scale(1);
-    border-color: white;
+    margin: 0;
+    accent-color: var(--rolecall-accent);
 }
 
 /* EXPAND ICON */

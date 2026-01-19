@@ -106,7 +106,7 @@ function createListItemElement(type, item) {
     const checkbox = $('<input type="checkbox" class="rolecall-select-checkbox">');
     checkbox.attr('data-id', item.id);
     checkboxEl.append(checkbox);
-    checkboxEl.hide(); // Hidden unless in multi-select mode
+    checkboxEl.css('display', 'none'); // Hidden unless in multi-select mode
     itemEl.append(checkboxEl);
 
     // For characters, add avatar thumbnail
@@ -543,7 +543,7 @@ export function toggleMultiSelectMode(type) {
         toggleBtn.find('i').removeClass('fa-check-square').addClass('fa-square');
 
         // Hide all checkboxes
-        listContainer.find('.rolecall-item-checkbox').hide();
+        listContainer.find('.rolecall-item-checkbox').css('display', 'none');
 
         // Uncheck all items
         listContainer.find('.rolecall-select-checkbox').prop('checked', false);
@@ -557,8 +557,8 @@ export function toggleMultiSelectMode(type) {
         // Update button icon to checked
         toggleBtn.find('i').removeClass('fa-square').addClass('fa-check-square');
 
-        // Show all checkboxes
-        listContainer.find('.rolecall-item-checkbox').show();
+        // Show all checkboxes (use flex display to match CSS)
+        listContainer.find('.rolecall-item-checkbox').css('display', 'flex');
 
         // Collapse all expanded items
         listContainer.find('.rolecall-item-wrapper.expanded').each(function() {

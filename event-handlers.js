@@ -245,7 +245,7 @@ async function exportSingleItem(type, id, options = {}) {
 
         await exportSingleChat(chat, exportOptions);
     } else if (type === 'personas') {
-        await exportSinglePersona(id);
+        await exportSinglePersona(id, options);
     } else {
         toastr.info(`Exporting ${type} will be implemented soon!`, 'RoleOut');
     }

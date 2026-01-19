@@ -276,7 +276,11 @@ function createItemOptionsPanel(type, item) {
             optionsGroup.append($('<div class="rolecall-no-options">Lorebooks export with all entries</div>'));
             break;
         case 'personas':
-            // No options needed - personas export as PNG with embedded metadata
+            // Show lorebook checkbox if persona has one attached
+            if (item.hasLorebook) {
+                const lorebookLabel = `Attached Lorebook: ${item.lorebookName}`;
+                optionsGroup.append(createOptionCheckbox(`persona_lorebook_${item.id}`, lorebookLabel, true));
+            }
             optionsGroup.append($('<div class="rolecall-no-options">Personas export as PNG with embedded metadata (like character cards)</div>'));
             break;
     }

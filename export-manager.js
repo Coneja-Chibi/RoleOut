@@ -878,9 +878,9 @@ export async function exportChatsAsZip(chatExports) {
  * @param {number} personaId - Persona ID (index in getPersonaList())
  * @returns {Promise<{success: boolean, error?: string}>}
  */
-export async function exportSinglePersona(personaId) {
+export async function exportSinglePersona(personaId, options = {}) {
     try {
-        console.log(`[${MODULE_NAME}] Exporting persona: ${personaId}`);
+        console.log(`[${MODULE_NAME}] Exporting persona: ${personaId}`, 'with options:', options);
 
         const personas = getPersonaList();
         const persona = personas.find(p => p.id === personaId);
@@ -916,14 +916,56 @@ export async function exportSinglePersona(personaId) {
         // Embed metadata into PNG using 'persona' keyword
         const pngWithMetadata = embedMetadataInPNG(pngData, 'persona', personaMetadata);
 
-        // Download as PNG file
-        const blob = new Blob([pngWithMetadata], { type: 'image/png' });
-        const filename = persona.avatar; // Keep original filename
-        downloadBlob(blob, filename);
+        // Check if we need to export with lorebook as ZIP
+        const shouldIncludeLorebook = persona.hasLorebook && options[`persona_lorebook_${personaId}`] !== false;
 
-        console.log(`[${MODULE_NAME}] Successfully exported persona: ${filename}`);
-        toastr.success(`Exported ${persona.name}`, 'RoleOut');
-        return { success: true };
+        if (shouldIncludeLorebook && persona.lorebookName) {
+            console.log(`[${MODULE_NAME}] Exporting persona with attached lorebook: ${persona.lorebookName}`);
+
+            // Import JSZip and world-info
+            const { default: JSZip } = await import('../../../../scripts/lib/jszip.module.min.js');
+            const { loadWorldInfo } = await import('../../../world-info.js');
+
+            const zip = new JSZip();
+
+            // Add persona PNG to ZIP
+            zip.file(persona.avatar, pngWithMetadata);
+
+            // Load and add lorebook
+            try {
+                const lorebookData = await loadWorldInfo(persona.lorebookName);
+                if (lorebookData) {
+                    const lorebookJson = JSON.stringify(lorebookData, null, 2);
+                    const safeLorebookName = persona.lorebookName.replace(/[^a-zA-Z0-9_.\- ]/g, '_').replace(/\s+/g, '_');
+                    zip.file(`${safeLorebookName}.json`, lorebookJson);
+                    console.log(`[${MODULE_NAME}] ✓ Added lorebook to ZIP: ${persona.lorebookName}`);
+                } else {
+                    console.warn(`[${MODULE_NAME}] Lorebook not found: ${persona.lorebookName}`);
+                }
+            } catch (lorebookError) {
+                console.error(`[${MODULE_NAME}] Failed to load lorebook:`, lorebookError);
+                // Continue anyway - export persona without lorebook
+            }
+
+            // Generate ZIP and download
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const safePersonaName = persona.name.replace(/[^a-zA-Z0-9_.\- ]/g, '_').replace(/\s+/g, '_');
+            const zipFilename = `${safePersonaName}_with_lorebook.zip`;
+            downloadBlob(zipBlob, zipFilename);
+
+            console.log(`[${MODULE_NAME}] Successfully exported persona with lorebook: ${zipFilename}`);
+            toastr.success(`Exported ${persona.name} with lorebook`, 'RoleOut');
+            return { success: true };
+        } else {
+            // Download as standalone PNG file
+            const blob = new Blob([pngWithMetadata], { type: 'image/png' });
+            const filename = persona.avatar; // Keep original filename
+            downloadBlob(blob, filename);
+
+            console.log(`[${MODULE_NAME}] Successfully exported persona: ${filename}`);
+            toastr.success(`Exported ${persona.name}`, 'RoleOut');
+            return { success: true };
+        }
 
     } catch (error) {
         console.error(`[${MODULE_NAME}] Persona export failed:`, error);
@@ -1000,6 +1042,24 @@ export async function exportPersonasAsZip(personaIds) {
 
                 // Add PNG to ZIP
                 zip.file(persona.avatar, pngWithMetadata);
+
+                // If persona has attached lorebook, add it to ZIP
+                if (persona.hasLorebook && persona.lorebookName) {
+                    try {
+                        const { loadWorldInfo } = await import('../../../world-info.js');
+                        const lorebookData = await loadWorldInfo(persona.lorebookName);
+                        if (lorebookData) {
+                            const lorebookJson = JSON.stringify(lorebookData, null, 2);
+                            const safeLorebookName = persona.lorebookName.replace(/[^a-zA-Z0-9_.\- ]/g, '_').replace(/\s+/g, '_');
+                            const safePersonaName = persona.name.replace(/[^a-zA-Z0-9_.\- ]/g, '_').replace(/\s+/g, '_');
+                            zip.file(`${safePersonaName}/${safeLorebookName}.json`, lorebookJson);
+                            console.log(`[${MODULE_NAME}] ✓ Added lorebook for ${persona.name}: ${persona.lorebookName}`);
+                        }
+                    } catch (lorebookError) {
+                        console.warn(`[${MODULE_NAME}] Failed to load lorebook for ${persona.name}:`, lorebookError);
+                        // Continue without lorebook - not critical
+                    }
+                }
 
                 exported++;
                 console.log(`[${MODULE_NAME}] Added persona: ${persona.name} (${exported}/${personaIds.length})`);

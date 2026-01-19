@@ -157,7 +157,7 @@ export function getLorebookList() {
 
 /**
  * Get personas
- * @returns {Array<{id: number, name: string, avatar: string, description: string, title: string, isDefault: boolean}>}
+ * @returns {Array<{id: number, name: string, avatar: string, description: string, title: string, isDefault: boolean, hasLorebook: boolean, lorebookName: string|null}>}
  */
 export function getPersonaList() {
     try {
@@ -172,13 +172,19 @@ export function getPersonaList() {
         return personaAvatars.map((avatar, index) => {
             const personaDesc = power_user.persona_descriptions?.[avatar] || {};
 
+            // Check for attached lorebook (similar to characters)
+            const lorebookName = personaDesc.lorebook || null;
+            const hasLorebook = !!lorebookName;
+
             return {
                 id: index,
                 name: power_user.personas[avatar] || '[Unnamed Persona]',
                 avatar: avatar,
                 description: personaDesc.description || '',
                 title: personaDesc.title || '',
-                isDefault: avatar === power_user.default_persona
+                isDefault: avatar === power_user.default_persona,
+                hasLorebook,
+                lorebookName
             };
         });
     } catch (error) {
